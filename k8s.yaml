@@ -46,7 +46,8 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - http:
+    - host: managed-agents.colab.duke.edu
+      http:
         paths:
           - path: /
             pathType: Prefix

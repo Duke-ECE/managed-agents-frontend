@@ -1,11 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
 import './App.css'
 
+const API_URL =
+  import.meta.env.VITE_API_URL ?? 'http://api-managed-agent.colab.duke.edu'
+
 function App() {
   const [count, setCount] = useState(0)
+  const [api, setApi] = useState({ status: 'loading' })
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/message`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((data) => setApi({ status: 'ok', ...data }))
+      .catch((err) => setApi({ status: 'error', error: String(err) }))
+  }, [])
 
   return (
     <>
@@ -28,6 +42,15 @@ function App() {
         >
           Count is {count}
         </button>
+        <div className="api-status">
+          {api.status === 'loading' && <p>Contacting API…</p>}
+          {api.status === 'ok' && (
+            <p>
+              API says: <strong>{api.message}</strong> (pod {api.servedBy})
+            </p>
+          )}
+          {api.status === 'error' && <p>API unreachable: {api.error}</p>}
+        </div>
       </section>
 
       <div className="ticks"></div>

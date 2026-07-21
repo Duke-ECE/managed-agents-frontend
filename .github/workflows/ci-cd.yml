@@ -49,6 +49,7 @@ jobs:
     needs: build-push
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: azure/setup-kubectl@v4
       - name: Deploy to k8s
         env:
@@ -56,6 +57,7 @@ jobs:
         run: |
           echo "$KUBE_CONFIG" > kubeconfig
           export KUBECONFIG=kubeconfig
+          kubectl apply -f k8s.yaml
           kubectl set image deploy/react-template nginx=${{ env.IMAGE }}:${{ github.sha }}
           kubectl rollout status deploy/react-template --timeout=180s
           rm -f kubeconfig
