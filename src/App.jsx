@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://api-managed-agent.colab.duke.edu'
+const API_URL = import.meta.env.VITE_API_URL || 'https://api-managed-agent.colab.duke.edu'
 
 const surfaces = [
   {
@@ -9,7 +9,7 @@ const surfaces = [
     label: 'Frontend',
     title: 'A clear entry point',
     description: 'A React interface for understanding the platform and seeing the system at a glance.',
-    href: 'http://managed-agents.colab.duke.edu',
+    href: 'https://managed-agents.colab.duke.edu',
     linkLabel: 'Open frontend',
   },
   {

@@ -43,8 +43,15 @@ metadata:
   name: react-template
   labels:
     app: react-template
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - managed-agents.colab.duke.edu
+      secretName: managed-agents-frontend-tls
   rules:
     - host: managed-agents.colab.duke.edu
       http:
