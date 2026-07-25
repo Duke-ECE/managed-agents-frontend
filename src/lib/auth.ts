@@ -31,6 +31,12 @@ export async function signInWithGitHub(): Promise<void> {
   if (error) throw error
 }
 
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  if (!supabase) throw new Error('Authentication is not configured')
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) throw error
+}
+
 export async function signOut(): Promise<void> {
   if (!supabase) return
   await supabase.auth.signOut()
