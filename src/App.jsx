@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import AgentChat from './AgentChat.jsx'
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api-managed-agent.colab.duke.edu'
 
@@ -75,6 +76,7 @@ function App() {
         </a>
         <nav className="nav-links" aria-label="Primary navigation">
           <a href="#platform">Platform</a>
+          <a href="#chat">Chat</a>
           <a href="#delivery">Delivery</a>
           <a href="https://duke-ece.github.io/managed-agents-docs/" target="_blank" rel="noreferrer">
             Docs <ArrowIcon />
@@ -169,6 +171,18 @@ function App() {
               </article>
             ))}
           </div>
+        </section>
+
+        <section className="chat-section section-wrap" id="chat">
+          <div className="section-heading">
+            <p className="eyebrow">Try it</p>
+            <h2>Chat with the backend.</h2>
+            <p>
+              Bring your own OpenAI-compatible credentials — a session is created on
+              your first message and replies stream back live.
+            </p>
+          </div>
+          <AgentChat />
         </section>
 
         <section className="delivery-section section-wrap" id="delivery">
