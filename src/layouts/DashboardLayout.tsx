@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, Box, Bot, MessagesSquare, ListTodo,
+  LayoutDashboard, Box, Bot, MessagesSquare, MessageSquare, ListTodo,
   Workflow, Settings, Search, Terminal, Bell, Sun, Moon,
   PanelLeftOpen, PanelLeftClose,
 } from 'lucide-react'
@@ -13,6 +13,7 @@ const navItems = [
   { to: '/sandboxes', label: 'Sandboxes', icon: Box },
   { to: '/agents', label: 'Agents', icon: Bot },
   { to: '/sessions', label: 'Sessions', icon: MessagesSquare },
+  { to: '/chat', label: 'Chat', icon: MessageSquare },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/orchestrations', label: 'Orchestrations', icon: Workflow },
 ]
@@ -22,6 +23,7 @@ const breadcrumbMap: Record<string, string> = {
   sandboxes: 'Sandboxes',
   agents: 'Agents',
   sessions: 'Sessions',
+  chat: 'Chat',
   tasks: 'Tasks',
   orchestrations: 'Orchestrations',
 }

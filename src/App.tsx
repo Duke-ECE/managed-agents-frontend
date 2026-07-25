@@ -10,6 +10,7 @@ import SessionDetail from './pages/sessions/SessionDetail'
 import TaskList from './pages/tasks/TaskList'
 import OrchestrationList from './pages/orchestrations/OrchestrationList'
 import OrchestrationDetail from './pages/orchestrations/OrchestrationDetail'
+import ChatPage from './pages/chat/ChatPage'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/agents/:id" element={<AgentDetail />} />
           <Route path="/sessions" element={<SessionList />} />
           <Route path="/sessions/:id" element={<SessionDetail />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route path="/tasks" element={<TaskList />} />
           <Route path="/orchestrations" element={<OrchestrationList />} />
           <Route path="/orchestrations/:id" element={<OrchestrationDetail />} />
