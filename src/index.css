@@ -1,0 +1,212 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* surface hierarchy: canvas (recessed) < panel (floating) < card (top) */
+  --color-canvas: #08090c;
+  --color-panel: #101116;
+
+  /* ink scale — values are dark-first; overridden under .light */
+  --color-ink-950: #08090c;
+  --color-ink-900: #17181e;
+  --color-ink-850: #1d1e26;
+  --color-ink-800: #242630;
+  --color-ink-700: #30323e;
+  --color-ink-600: #404350;
+  --color-ink-500: #5c5f6e;
+  --color-ink-400: #7d8090;
+  --color-ink-300: #9ea1b0;
+  --color-ink-200: #c4c6d2;
+  --color-ink-100: #e4e5ee;
+  --color-ink-50: #f5f5f8;
+
+  --color-accent: #0070f3;
+  --color-accent-hover: #0060df;
+  --color-accent-fg: #6ea8ff;
+
+  /* semantic status tones — dark-first; overridden under .light */
+  --color-good: #34d399;
+  --color-good-soft: rgb(52 211 153 / 0.12);
+  --color-good-line: rgb(52 211 153 / 0.28);
+  --color-info: #6ea8ff;
+  --color-info-soft: rgb(0 112 243 / 0.14);
+  --color-info-line: rgb(0 112 243 / 0.30);
+  --color-warn: #fbbf24;
+  --color-warn-soft: rgb(251 191 36 / 0.12);
+  --color-warn-line: rgb(251 191 36 / 0.28);
+  --color-bad: #f87171;
+  --color-bad-soft: rgb(248 113 113 / 0.12);
+  --color-bad-line: rgb(248 113 113 / 0.28);
+  --color-vio: #a78bfa;
+  --color-vio-soft: rgb(167 139 250 / 0.12);
+  --color-vio-line: rgb(167 139 250 / 0.28);
+  --color-cyn: #22d3ee;
+  --color-cyn-soft: rgb(34 211 238 / 0.12);
+  --color-cyn-line: rgb(34 211 238 / 0.28);
+
+  /* elevation — restrained; values resolve at runtime via --sh-* so they theme-switch */
+  --shadow-lift: var(--sh-lift);
+  --shadow-float: var(--sh-float);
+  --shadow-glow: var(--sh-glow);
+  --shadow-card: var(--sh-card);
+  --shadow-panel: var(--sh-panel);
+
+  --animate-fade-up: fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.3s ease both;
+  --animate-scale-in: scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-slide-in-right: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-pulse-dot: pulse-dot 2s ease-in-out infinite;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(40px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+}
+
+/* ============ ELEVATION (dark default, must precede .light) ============ */
+:root {
+  /* restrained — the hairline edge does the work, shadow is a whisper */
+  --sh-lift: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px -6px rgb(0 0 0 / 0.3);
+  --sh-float: 0 0 0 1px rgb(255 255 255 / 0.06) inset, 0 8px 20px -10px rgb(0 0 0 / 0.45);
+  --sh-glow: 0 0 0 1px rgb(255 255 255 / 0.04) inset, 0 1px 0 rgb(255 255 255 / 0.04) inset;
+  --sh-card: 0 0 0 1px rgb(255 255 255 / 0.035) inset, 0 1px 2px rgb(0 0 0 / 0.25), 0 6px 16px -10px rgb(0 0 0 / 0.35);
+  --sh-panel: 0 0 0 1px rgb(255 255 255 / 0.05) inset, 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -20px rgb(0 0 0 / 0.4);
+}
+
+/* ============ LIGHT THEME OVERRIDES ============ */
+.light {
+  --color-canvas: #e2e4ea;
+  --color-panel: #f3f4f7;
+
+  --color-ink-950: #e2e4ea;
+  --color-ink-900: #ffffff;
+  --color-ink-850: #edeef2;
+  --color-ink-800: #e1e3e9;
+  --color-ink-700: #d1d4dc;
+  --color-ink-600: #babec9;
+  --color-ink-500: #9498a6;
+  --color-ink-400: #757988;
+  --color-ink-300: #585c6b;
+  --color-ink-200: #3c4050;
+  --color-ink-100: #232734;
+  --color-ink-50: #101320;
+
+  --color-accent: #0070f3;
+  --color-accent-hover: #005cd6;
+  --color-accent-fg: #0059c9;
+
+  --color-good: #059669;
+  --color-good-soft: rgb(5 150 105 / 0.10);
+  --color-good-line: rgb(5 150 105 / 0.25);
+  --color-info: #0059c9;
+  --color-info-soft: rgb(0 112 243 / 0.10);
+  --color-info-line: rgb(0 112 243 / 0.25);
+  --color-warn: #b45309;
+  --color-warn-soft: rgb(217 119 6 / 0.12);
+  --color-warn-line: rgb(217 119 6 / 0.28);
+  --color-bad: #dc2626;
+  --color-bad-soft: rgb(220 38 38 / 0.10);
+  --color-bad-line: rgb(220 38 38 / 0.25);
+  --color-vio: #7c3aed;
+  --color-vio-soft: rgb(124 58 237 / 0.10);
+  --color-vio-line: rgb(124 58 237 / 0.25);
+  --color-cyn: #0891b2;
+  --color-cyn-soft: rgb(8 145 178 / 0.10);
+  --color-cyn-line: rgb(8 145 178 / 0.25);
+
+  --sh-lift: 0 1px 2px rgb(16 24 40 / 0.05), 0 4px 12px -6px rgb(16 24 40 / 0.06);
+  --sh-float: 0 0 0 1px rgb(16 24 40 / 0.05), 0 8px 20px -10px rgb(16 24 40 / 0.12);
+  --sh-glow: 0 0 0 1px rgb(255 255 255 / 0.6) inset, 0 1px 0 rgb(255 255 255 / 0.7) inset;
+  --sh-card: 0 0 0 1px rgb(16 24 40 / 0.045), 0 1px 2px rgb(16 24 40 / 0.04), 0 6px 16px -10px rgb(16 24 40 / 0.06);
+  --sh-panel: 0 0 0 1px rgb(16 24 40 / 0.05), 0 1px 2px rgb(16 24 40 / 0.04), 0 16px 40px -20px rgb(16 24 40 / 0.1);
+}
+
+/* ambient glow + grid line colors (theme-aware) */
+:root {
+  --glow-a: rgb(0 112 243 / 0.09);
+  --glow-b: rgb(139 92 246 / 0.06);
+  --grid-line: rgb(255 255 255 / 0.022);
+  --focal: rgb(0 112 243 / 0.05);
+}
+.light {
+  --glow-a: rgb(0 112 243 / 0.07);
+  --glow-b: rgb(124 58 237 / 0.05);
+  --grid-line: rgb(16 24 40 / 0.035);
+  --focal: rgb(0 112 243 / 0.045);
+}
+
+html { color-scheme: dark; }
+html.light { color-scheme: light; }
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-canvas);
+  color: var(--color-ink-100);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Smooth cross-fade only while the theme is switching */
+html.theming, html.theming *, html.theming *::before, html.theming *::after {
+  transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease,
+    fill 0.35s ease, stroke 0.35s ease, box-shadow 0.35s ease !important;
+}
+
+/* The recessed canvas — sidebar + gutters sit on this layer */
+.app-canvas {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-canvas) 88%, var(--glow-a)) 0%, var(--color-canvas) 240px),
+    var(--color-canvas);
+}
+
+/* Focal glow that pulls the eye to the content stage */
+.focal-glow {
+  background:
+    radial-gradient(ellipse 70% 42% at 55% 0%, var(--focal), transparent 70%);
+}
+
+/* Subtle grid texture */
+.grid-texture {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-ink-700); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-ink-600); }
+
+/* Staggered reveal helper */
+.stagger > * {
+  animation: fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 50ms; }
+.stagger > *:nth-child(3) { animation-delay: 100ms; }
+.stagger > *:nth-child(4) { animation-delay: 150ms; }
+.stagger > *:nth-child(5) { animation-delay: 200ms; }
+.stagger > *:nth-child(6) { animation-delay: 250ms; }
+.stagger > *:nth-child(7) { animation-delay: 300ms; }
+.stagger > *:nth-child(8) { animation-delay: 350ms; }
