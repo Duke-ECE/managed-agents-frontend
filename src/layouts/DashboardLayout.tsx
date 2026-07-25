@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Box, Bot, MessagesSquare, MessageSquare, ListTodo,
-  Workflow, Settings, Search, Terminal, Bell, Sun, Moon,
-  PanelLeftOpen, PanelLeftClose,
+  Workflow, Search, Terminal, Bell, Sun, Moon,
+  PanelLeftOpen, PanelLeftClose, LogOut,
 } from 'lucide-react'
 import { cn } from '../utils/format'
 import { useTheme } from '../hooks/useTheme'
+import { useAuth } from '../components/AuthProvider'
+import { signOut } from '../lib/auth'
 
 const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -33,6 +35,17 @@ const breadcrumbMap: Record<string, string> = {
  * closed. One click on the top-left toggle switches between the two.
  */
 function Sidebar({ open }: { open: boolean }) {
+  const { session } = useAuth()
+  const user = session?.user
+  const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>
+  const avatarUrl = typeof metadata.avatar_url === 'string' ? metadata.avatar_url : null
+  const displayName =
+    (typeof metadata.user_name === 'string' && metadata.user_name) ||
+    (typeof metadata.name === 'string' && metadata.name) ||
+    user?.email ||
+    'Signed in'
+  const email = user?.email ?? ''
+
   return (
     <aside
       className={cn(
@@ -93,14 +106,29 @@ function Sidebar({ open }: { open: boolean }) {
       {/* Bottom */}
       <div className="px-3 py-3">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-ink-500/[0.07]">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-[12px] font-semibold text-white">
-            LC
-          </div>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={displayName}
+              className="h-8 w-8 shrink-0 rounded-full border border-ink-700"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-[12px] font-semibold text-white">
+              {displayName.slice(0, 2).toUpperCase()}
+            </div>
+          )}
           <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-[13px] font-medium text-ink-100">lea.chen</div>
-            <div className="text-[11px] text-ink-400">Administrator</div>
+            <div className="truncate text-[13px] font-medium text-ink-100">{displayName}</div>
+            <div className="truncate text-[11px] text-ink-400">{email}</div>
           </div>
-          <Settings className="h-4 w-4 shrink-0 text-ink-400 transition-transform duration-300 hover:rotate-90" />
+          <button
+            onClick={() => void signOut()}
+            title="Sign out"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-ink-500/[0.10] hover:text-bad"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </aside>

@@ -1,7 +1,11 @@
 /**
  * Typed port of the previous app's src/api.js — talks to the managed-agents
  * agent-runtime backend (session lifecycle + SSE message streaming).
+ * Every request carries the Supabase access token; the backend derives the
+ * user from it. A 401 means the token is rejected — the local session is
+ * cleared and the route guard sends the user back to /login.
  */
+import { getSession, handleUnauthorized } from './auth'
 
 const API_BASE: string =
   import.meta.env.VITE_API_URL ?? 'https://api-managed-agent.colab.duke.edu'
@@ -58,8 +62,14 @@ export interface DonePayload {
   output_tokens?: number
 }
 
+async function authHeaders(): Promise<Record<string, string>> {
+  const session = await getSession()
+  return session ? { Authorization: `Bearer ${session.access_token}` } : {}
+}
+
 async function throwIfNotOk(res: Response): Promise<void> {
   if (res.ok) return
+  if (res.status === 401) await handleUnauthorized()
   let body = ''
   try {
     const data: unknown = await res.json()
@@ -76,11 +86,12 @@ async function throwIfNotOk(res: Response): Promise<void> {
   throw new ApiError(res.status, body)
 }
 
-export async function createSession(userId: string, llm: LlmConfig): Promise<string> {
+export async function createSession(llm: LlmConfig): Promise<string> {
   const res = await fetch(`${API_BASE}/api/sessions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, llm }),
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    // user_id is derived from the bearer token on the backend.
+    body: JSON.stringify({ llm }),
   })
   await throwIfNotOk(res)
   const data = (await res.json()) as { session_id: string }
@@ -90,6 +101,7 @@ export async function createSession(userId: string, llm: LlmConfig): Promise<str
 export async function deleteSession(sessionId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
     method: 'DELETE',
+    headers: await authHeaders(),
   })
   await throwIfNotOk(res)
 }
@@ -130,7 +142,7 @@ export async function streamSessionMessage(
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ content }),
     signal,
   })

@@ -19,7 +19,6 @@ import {
 } from '../../lib/chat-api'
 
 const SETTINGS_KEY = 'managed-agents.settings'
-const USER_ID_KEY = 'managed-agents.user-id'
 
 interface LlmSettings {
   apiKey: string
@@ -40,15 +39,6 @@ function loadSettings(): LlmSettings {
   } catch {
     return DEFAULT_SETTINGS
   }
-}
-
-function loadUserId(): string {
-  let id = localStorage.getItem(USER_ID_KEY)
-  if (!id) {
-    id = crypto.randomUUID()
-    localStorage.setItem(USER_ID_KEY, id)
-  }
-  return id
 }
 
 interface ToolEventItem {
@@ -223,7 +213,6 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 
 export default function ChatPage() {
   const [settings, setSettings] = useState<LlmSettings>(loadSettings)
-  const [userId] = useState<string>(loadUserId)
   const [settingsOpen, setSettingsOpen] = useState(() => !loadSettings().apiKey)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -282,7 +271,7 @@ export default function ChatPage() {
       try {
         let sid = sessionId
         if (!sid) {
-          sid = await createSession(userId, {
+          sid = await createSession({
             api_key: settings.apiKey,
             base_url: settings.baseUrl,
             model: settings.model,
@@ -346,7 +335,7 @@ export default function ChatPage() {
         abortRef.current = null
       }
     },
-    [sessionId, settings, streaming, userId],
+    [sessionId, settings, streaming],
   )
 
   const ready = Boolean(settings.apiKey)
