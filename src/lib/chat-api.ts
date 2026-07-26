@@ -86,12 +86,13 @@ async function throwIfNotOk(res: Response): Promise<void> {
   throw new ApiError(res.status, body)
 }
 
-export async function createSession(llm: LlmConfig): Promise<string> {
+export async function createSession(llm?: LlmConfig): Promise<string> {
   const res = await fetch(`${API_BASE}/api/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-    // user_id is derived from the bearer token on the backend.
-    body: JSON.stringify({ llm }),
+    // user_id is derived from the bearer token on the backend. When llm is
+    // omitted the backend injects the platform default provider.
+    body: JSON.stringify(llm ? { llm } : {}),
   })
   await throwIfNotOk(res)
   const data = (await res.json()) as { session_id: string }

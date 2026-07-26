@@ -21,12 +21,14 @@ import {
 const SETTINGS_KEY = 'managed-agents.settings'
 
 interface LlmSettings {
+  mode: 'default' | 'custom'
   apiKey: string
   baseUrl: string
   model: string
 }
 
 const DEFAULT_SETTINGS: LlmSettings = {
+  mode: 'default',
   apiKey: '',
   baseUrl: 'https://api.openai.com/v1',
   model: 'gpt-4o-mini',
@@ -35,7 +37,11 @@ const DEFAULT_SETTINGS: LlmSettings = {
 function loadSettings(): LlmSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
-    return raw ? { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<LlmSettings>) } : DEFAULT_SETTINGS
+    if (!raw) return DEFAULT_SETTINGS
+    const parsed = JSON.parse(raw) as Partial<LlmSettings>
+    // Settings saved before the mode toggle existed: a saved key means custom.
+    const mode = parsed.mode ?? (parsed.apiKey ? 'custom' : 'default')
+    return { ...DEFAULT_SETTINGS, ...parsed, mode }
   } catch {
     return DEFAULT_SETTINGS
   }
@@ -74,6 +80,7 @@ function SettingsPanel({
   const save = (e: FormEvent) => {
     e.preventDefault()
     onSave({
+      mode: draft.mode,
       apiKey: draft.apiKey.trim(),
       baseUrl: draft.baseUrl.trim() || DEFAULT_SETTINGS.baseUrl,
       model: draft.model.trim() || DEFAULT_SETTINGS.model,
@@ -86,6 +93,28 @@ function SettingsPanel({
   return (
     <Card className="mb-5 p-5 animate-fade-in">
       <form onSubmit={save} className="space-y-4">
+        <div className="flex gap-2">
+          {(['default', 'custom'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setDraft((d) => ({ ...d, mode: m }))}
+              className={cn(
+                'h-8 rounded-lg border px-3 text-[12px] font-medium transition-colors',
+                draft.mode === m
+                  ? 'border-accent bg-accent/10 text-ink-100'
+                  : 'border-ink-700 bg-ink-850 text-ink-400 hover:text-ink-200',
+              )}
+            >
+              {m === 'default' ? 'Default provider' : 'Custom provider'}
+            </button>
+          ))}
+        </div>
+        {draft.mode === 'default' ? (
+          <p className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-2.5 text-[12px] text-ink-400">
+            OpenRouter · openai/gpt-oss-20b:free — provided by the platform, no API key needed.
+          </p>
+        ) : (
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="block">
             <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400">API key</span>
@@ -119,6 +148,7 @@ function SettingsPanel({
             />
           </label>
         </div>
+        )}
         <div className="flex items-center justify-between gap-4">
           <p className="text-[12px] text-ink-500">
             Stored in your browser only; sent to the managed-agents backend when a session is created.
@@ -271,11 +301,15 @@ export default function ChatPage() {
       try {
         let sid = sessionId
         if (!sid) {
-          sid = await createSession({
-            api_key: settings.apiKey,
-            base_url: settings.baseUrl,
-            model: settings.model,
-          })
+          // Default mode → omit llm so the backend uses the platform provider.
+          sid =
+            settings.mode === 'custom' && settings.apiKey
+              ? await createSession({
+                  api_key: settings.apiKey,
+                  base_url: settings.baseUrl,
+                  model: settings.model,
+                })
+              : await createSession()
           setSessionId(sid)
         }
 
