@@ -243,7 +243,12 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 
 export default function ChatPage() {
   const [settings, setSettings] = useState<LlmSettings>(loadSettings)
-  const [settingsOpen, setSettingsOpen] = useState(() => !loadSettings().apiKey)
+  // Auto-open settings only when configuration is actually needed:
+  // custom mode without a key. Default mode works out of the box.
+  const [settingsOpen, setSettingsOpen] = useState(() => {
+    const s = loadSettings()
+    return s.mode === 'custom' && !s.apiKey
+  })
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState(false)
@@ -372,7 +377,7 @@ export default function ChatPage() {
     [sessionId, settings, streaming],
   )
 
-  const ready = Boolean(settings.apiKey)
+  const ready = settings.mode === 'default' || Boolean(settings.apiKey)
 
   return (
     <div className="mx-auto flex h-full max-w-[860px] flex-col">
