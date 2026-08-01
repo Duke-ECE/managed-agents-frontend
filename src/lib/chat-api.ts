@@ -26,6 +26,25 @@ export interface LlmConfig {
   model: string
 }
 
+// The backend marshals protos with protojson UseProtoNames — responses are
+// snake_case, mirroring proto/session/v1/session.proto.
+export interface SessionRecord {
+  id: string
+  user_id: string
+  status: string // "active" | "ended"
+  llm_model?: string
+  created_at: string
+  last_active: string
+  ended_at?: string
+}
+
+export interface TranscriptMessage {
+  seq: number
+  role: string // "user" | "assistant" | "tool_call" | "tool_result"
+  content_json: string // role-specific payload, JSON-encoded
+  created_at: string
+}
+
 export type SseEventName =
   | 'text_delta'
   | 'tool_call'
@@ -105,6 +124,24 @@ export async function deleteSession(sessionId: string): Promise<void> {
     headers: await authHeaders(),
   })
   await throwIfNotOk(res)
+}
+
+export async function listSessions(): Promise<SessionRecord[]> {
+  const res = await fetch(`${API_BASE}/api/sessions`, {
+    headers: await authHeaders(),
+  })
+  await throwIfNotOk(res)
+  const data = (await res.json()) as { sessions?: SessionRecord[] }
+  return data.sessions ?? []
+}
+
+export async function getTranscript(sessionId: string): Promise<TranscriptMessage[]> {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages`, {
+    headers: await authHeaders(),
+  })
+  await throwIfNotOk(res)
+  const data = (await res.json()) as { messages?: TranscriptMessage[] }
+  return data.messages ?? []
 }
 
 // Parse a single SSE frame ("event: x\ndata: {...}") into { event, data }.

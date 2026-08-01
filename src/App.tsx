@@ -35,6 +35,7 @@ export default function App() {
             <Route path="/sessions" element={<SessionList />} />
             <Route path="/sessions/:id" element={<SessionDetail />} />
             <Route path="/chat" element={<ChatPage />} />
+            <Route path="/chat/:id" element={<ChatPage />} />
             <Route path="/tasks" element={<TaskList />} />
             <Route path="/orchestrations" element={<OrchestrationList />} />
             <Route path="/orchestrations/:id" element={<OrchestrationDetail />} />
