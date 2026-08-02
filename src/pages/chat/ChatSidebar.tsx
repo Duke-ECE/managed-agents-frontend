@@ -15,6 +15,7 @@ export default function ChatSidebar({
   onNew,
   onSelect,
   onEnd,
+  onPrefetchSession,
 }: {
   /** null while the first load is in flight */
   sessions: SessionRecord[] | null
@@ -25,6 +26,8 @@ export default function ChatSidebar({
   onNew: () => void
   onSelect: (id: string) => void
   onEnd: (id: string) => void
+  /** hover warmup for the transcript cache; best-effort */
+  onPrefetchSession?: (id: string) => void
 }) {
   const sorted = [...(sessions ?? [])].sort((a, b) => {
     if ((a.status === 'active') !== (b.status === 'active')) return a.status === 'active' ? -1 : 1
@@ -70,6 +73,7 @@ export default function ChatSidebar({
           return (
             <div
               key={s.id}
+              onMouseEnter={() => onPrefetchSession?.(s.id)}
               className={cn(
                 'group relative flex items-center rounded-lg transition-colors',
                 active ? 'bg-ink-500/[0.10]' : 'hover:bg-ink-500/[0.07]',

@@ -8,6 +8,7 @@ import { Button } from '../../components/ConfirmDialog'
 import { Card, PageHeader } from '../../components/Primitives'
 import { cn } from '../../utils/format'
 import ChatSidebar from './ChatSidebar'
+import { SwrCache } from './transcript-cache'
 import {
   ApiError,
   createSession,
@@ -315,10 +316,21 @@ export default function ChatPage() {
   // Session created by the first message of a fresh /chat — the route change
   // it triggers must not wipe the live stream by reloading the transcript.
   const createdIdRef = useRef<string | null>(null)
+  // Component-lifetime SWR transcript cache: revisits render instantly from
+  // cache while the network copy revalidates in the background.
+  const cacheRef = useRef(new SwrCache<ChatMessage[]>())
+  // Latest messages for the transcript effect's cleanup (cache on leave).
+  const messagesRef = useRef<ChatMessage[]>([])
+  // Set when the server answers 410/404/403 — never cache such a session.
+  const sessionGoneRef = useRef(false)
 
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
   }, [settings])
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -333,7 +345,9 @@ export default function ChatPage() {
     return () => { cancelled = true }
   }, [])
 
-  // Load the transcript whenever the URL picks a session.
+  // Load the transcript whenever the URL picks a session. SWR: a cached
+  // transcript renders instantly while the network copy revalidates in the
+  // background (no loading state); a miss shows the loading state as before.
   useEffect(() => {
     // A session created from /chat adopts its id in the URL while its first
     // turn streams live — skip the reload for it (kept until navigation moves
@@ -343,17 +357,32 @@ export default function ChatPage() {
     if (routeId && createdIdRef.current === routeId) return
     abortRef.current?.abort()
     setStreaming(false)
-    setMessages([])
     setSessionEnded(false)
     setSessionMissing(false)
     setHistoryError(null)
-    if (!routeId) return
+    sessionGoneRef.current = false
+    if (!routeId) {
+      setMessages([])
+      return
+    }
+    const cache = cacheRef.current
+    const hasCached = cache.has(routeId)
+    const displayed = cache.get(routeId) ?? []
+    setMessages(displayed)
     let cancelled = false
-    setHistoryLoading(true)
+    if (!hasCached) setHistoryLoading(true)
+    // Always revalidate — in the background when a cached view is on screen.
     getTranscript(routeId)
       .then((turns) => {
         if (cancelled) return
-        setMessages(transcriptToMessages(turns, () => nextMsgId.current++))
+        // The user may have started a new turn while this fetch was in
+        // flight (the composer is enabled on a cache hit). If local state
+        // moved past what we displayed, it is ahead of the server copy —
+        // keep it; the leave-cleanup will cache the local view instead.
+        if (messagesRef.current !== displayed) return
+        const fresh = transcriptToMessages(turns, () => nextMsgId.current++)
+        setMessages(fresh)
+        cache.set(routeId, fresh)
         const firstUser = turns.find((t) => t.role === 'user')
         if (firstUser) {
           const title = turnText(firstUser.content_json).trim().slice(0, 40)
@@ -362,12 +391,28 @@ export default function ChatPage() {
       })
       .catch((err) => {
         if (cancelled) return
-        if (err instanceof ApiError && err.status === 410) setSessionEnded(true)
-        else if (err instanceof ApiError && (err.status === 404 || err.status === 403)) setSessionMissing(true)
-        else setHistoryError(err instanceof Error ? err.message : String(err))
+        if (err instanceof ApiError && err.status === 410) {
+          sessionGoneRef.current = true
+          cache.delete(routeId)
+          setSessionEnded(true)
+        } else if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
+          sessionGoneRef.current = true
+          cache.delete(routeId)
+          setSessionMissing(true)
+        } else if (!hasCached) {
+          // With a cached view on screen, keep it — the next visit revalidates.
+          setHistoryError(err instanceof Error ? err.message : String(err))
+        }
       })
       .finally(() => { if (!cancelled) setHistoryLoading(false) })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      // Cache live turns when navigating away so revisiting renders instantly;
+      // never cache sessions the server says are gone or ended.
+      if (routeId && !sessionGoneRef.current && messagesRef.current.length > 0) {
+        cache.set(routeId, messagesRef.current)
+      }
+    }
   }, [routeId])
 
   // The sidebar list knows a session is ended before any transcript request.
@@ -392,6 +437,9 @@ export default function ChatPage() {
   const endChat = useCallback(
     (sid: string) => {
       deleteSession(sid).catch(() => {}) // best effort
+      cacheRef.current.delete(sid)
+      // Ending the open session navigates away — don't re-cache it on leave.
+      if (sid === routeId) sessionGoneRef.current = true
       setSessions((list) => list?.filter((s) => s.id !== sid) ?? list)
       setTitles((t) => {
         const next = { ...t }
@@ -402,6 +450,18 @@ export default function ChatPage() {
     },
     [navigate, routeId],
   )
+
+  // Sidebar hover prefetch: warm the transcript cache so selecting a session
+  // renders instantly. Best-effort — failures are swallowed and surface (if
+  // still relevant) on real navigation. Ended sessions are fine to prefetch;
+  // their transcripts are immutable.
+  const prefetchSession = useCallback((sid: string) => {
+    const cache = cacheRef.current
+    if (cache.has(sid)) return
+    getTranscript(sid)
+      .then((turns) => cache.set(sid, transcriptToMessages(turns, () => nextMsgId.current++)))
+      .catch(() => {})
+  }, [])
 
   const saveSettings = useCallback(
     (next: LlmSettings) => {
@@ -536,6 +596,7 @@ export default function ChatPage() {
         onNew={newChat}
         onSelect={(sid) => navigate(`/chat/${sid}`)}
         onEnd={endChat}
+        onPrefetchSession={prefetchSession}
       />
 
       <div className="mx-auto flex w-full min-w-0 max-w-[860px] flex-1 flex-col">
