@@ -20,9 +20,11 @@ const labelCls =
   'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400'
 
 /**
- * Whitelist management — members may use the platform LLM provider, admins
- * manage this list. The backend is the real gate; this page only renders
- * what /api/admin/members allows (403/401 → no-permission state).
+ * Platform LLM access control — members may chat with the platform-provided
+ * LLM key, everyone else configures their own. This is NOT login
+ * permission: sign-in is open to any GitHub account. The backend is the
+ * real gate; this page only renders what /api/admin/members allows
+ * (403/401 → no-permission state).
  */
 export default function AdminPage() {
   const [members, setMembers] = useState<Member[] | null>(null)
@@ -114,8 +116,8 @@ export default function AdminPage() {
   return (
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
-        title="Admin"
-        description="Whitelist management — members may use the platform LLM provider; admins manage this list."
+        title="LLM Access"
+        description="Who may use the platform-provided LLM key. Members chat key-free; everyone else configures their own API key. Sign-in is open to any GitHub account — this list does not control login."
       />
 
       {noPermission ? (

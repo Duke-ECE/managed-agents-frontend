@@ -37,7 +37,7 @@ const breadcrumbMap: Record<string, string> = {
   chat: 'Chat',
   tasks: 'Tasks',
   orchestrations: 'Orchestrations',
-  admin: 'Admin',
+  admin: 'LLM Access',
 }
 
 /**
@@ -77,7 +77,7 @@ function Sidebar({ open, isAdmin }: { open: boolean; isAdmin: boolean }) {
       {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         <div className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">Platform</div>
-        {[...navItems, ...(isAdmin ? [{ to: '/admin', label: 'Admin', icon: ShieldCheck }] : [])].map(({ to, label, icon: Icon, end }: NavItem) => (
+        {[...navItems, ...(isAdmin ? [{ to: '/admin', label: 'LLM Access', icon: ShieldCheck }] : [])].map(({ to, label, icon: Icon, end }: NavItem) => (
           <NavLink
             key={to}
             to={to}
