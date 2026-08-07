@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, Box, Bot, MessagesSquare, MessageSquare, ListTodo,
-  Workflow, Search, Terminal, Bell, Sun, Moon,
+  MessagesSquare, MessageSquare, Search, Terminal, Bell, Sun, Moon,
   PanelLeftOpen, PanelLeftClose, LogOut, ShieldCheck,
   type LucideIcon,
 } from 'lucide-react'
@@ -20,23 +19,13 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
-  { to: '/sandboxes', label: 'Sandboxes', icon: Box },
-  { to: '/agents', label: 'Agents', icon: Bot },
-  { to: '/sessions', label: 'Sessions', icon: MessagesSquare },
   { to: '/chat', label: 'Chat', icon: MessageSquare },
-  { to: '/tasks', label: 'Tasks', icon: ListTodo },
-  { to: '/orchestrations', label: 'Orchestrations', icon: Workflow },
+  { to: '/sessions', label: 'Sessions', icon: MessagesSquare },
 ]
 
 const breadcrumbMap: Record<string, string> = {
-  '': 'Overview',
-  sandboxes: 'Sandboxes',
-  agents: 'Agents',
-  sessions: 'Sessions',
   chat: 'Chat',
-  tasks: 'Tasks',
-  orchestrations: 'Orchestrations',
+  sessions: 'Sessions',
   admin: 'LLM Access',
 }
 
@@ -155,7 +144,7 @@ function Header({
 }) {
   const { pathname } = useLocation()
   const segments = pathname.split('/').filter(Boolean)
-  const section = breadcrumbMap[segments[0] ?? ''] ?? 'Overview'
+  const section = breadcrumbMap[segments[0] ?? ''] ?? 'Chat'
   const isDetail = segments.length > 1
 
   return (

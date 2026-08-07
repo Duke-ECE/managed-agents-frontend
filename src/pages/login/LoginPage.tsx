@@ -60,7 +60,7 @@ export default function LoginPage() {
               <BrandMark />
             </div>
             <p className="mt-5 text-center text-[13px] leading-relaxed text-ink-400">
-              Sign in to manage your sandboxes, agents, and sessions.
+              Sign in to chat with your managed agents.
             </p>
 
             <form onSubmit={signInWithEmail} className="mt-6 space-y-4">
