@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  MessagesSquare, MessageSquare, Search, Terminal, Bell, Sun, Moon,
+  MessagesSquare, MessageSquare, Terminal, Sun, Moon, Loader2,
   PanelLeftOpen, PanelLeftClose, LogOut, ShieldCheck,
   type LucideIcon,
 } from 'lucide-react'
@@ -174,12 +174,6 @@ function Header({
       </div>
 
       <div className="ml-auto flex items-center gap-3">
-        <button className="hidden h-9 w-64 items-center gap-2 rounded-lg border border-ink-700 bg-ink-850 px-3 text-[13px] text-ink-400 transition-colors hover:border-ink-600 hover:text-ink-300 md:flex">
-          <Search className="h-3.5 w-3.5" />
-          <span className="flex-1 text-left">Search resources…</span>
-          <kbd className="rounded border border-ink-700 bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] text-ink-400">⌘K</kbd>
-        </button>
-
         <button
           onClick={onToggleTheme}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -192,11 +186,6 @@ function Header({
           <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-good" />
           production
         </span>
-
-        <button className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-ink-700 bg-ink-850 text-ink-300 transition-colors hover:border-ink-600 hover:text-ink-100">
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent" />
-        </button>
       </div>
     </header>
   )
@@ -229,7 +218,15 @@ export default function DashboardLayout() {
             <main className="relative flex-1 overflow-hidden">
               <div className="focal-glow pointer-events-none absolute inset-0" aria-hidden />
               <div className="grid-texture relative h-full overflow-y-auto px-8 py-8">
-                <Outlet />
+                <Suspense
+                  fallback={
+                    <div className="flex h-full items-center justify-center">
+                      <Loader2 className="h-5 w-5 animate-spin text-ink-500" />
+                    </div>
+                  }
+                >
+                  <Outlet />
+                </Suspense>
               </div>
             </main>
           </div>

@@ -69,8 +69,15 @@ export default function SessionList() {
       key: 'id', header: 'Session',
       render: s => (
         <div className="leading-tight">
-          <div className="font-mono text-[12px] font-medium text-ink-50">{s.id}</div>
-          <div className="text-[11px] text-ink-500">created {timeAgo(s.created_at)}</div>
+          {s.title ? (
+            <div className="text-[13px] font-medium text-ink-50">{s.title}</div>
+          ) : (
+            <div className="font-mono text-[12px] font-medium text-ink-50">{s.id}</div>
+          )}
+          <div className="text-[11px] text-ink-500">
+            {s.title && <span className="font-mono">{s.id} · </span>}
+            created {timeAgo(s.created_at)}
+          </div>
         </div>
       ),
     },

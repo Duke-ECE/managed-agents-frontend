@@ -85,7 +85,7 @@ export default function ChatSidebar({
                 className="min-w-0 flex-1 px-3 py-2 text-left"
               >
                 <div className={cn('truncate text-[13px] font-medium', active ? 'text-ink-50' : 'text-ink-200')}>
-                  {titles[s.id] ?? `Session ${s.id.slice(-6)}`}
+                  {s.title ?? titles[s.id] ?? `Session ${s.id.slice(-6)}`}
                 </div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-500">
                   {s.status !== 'active' && <span className="rounded border border-ink-700 px-1 text-[9px] uppercase">ended</span>}

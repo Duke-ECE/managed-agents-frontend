@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle, Bot, CircleCheck, CircleX, Loader2, MessageSquare,
-  SendHorizontal, Settings2, User, Wrench,
+  SendHorizontal, Settings2, Square, User, Wrench,
 } from 'lucide-react'
 import { Button } from '../../components/ConfirmDialog'
 import { Card, PageHeader } from '../../components/Primitives'
 import { cn } from '../../utils/format'
 import ChatSidebar from './ChatSidebar'
+import Markdown from './Markdown'
 import { SwrCache } from './transcript-cache'
 import {
   ApiError,
@@ -273,9 +274,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
             {msg.tools.map((tool, i) => <ToolLine key={i} item={tool} />)}
           </div>
         )}
-        {msg.text && (
-          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-200">{msg.text}</p>
-        )}
+        {msg.text && <Markdown text={msg.text} />}
         {!msg.text && !msg.done && !msg.error && (
           <p className="flex items-center gap-2 text-[13px] text-ink-500">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> thinking…
@@ -450,6 +449,12 @@ export default function ChatPage() {
   useEffect(() => {
     if (routeId && sessions?.find((s) => s.id === routeId)?.status === 'ended') setSessionEnded(true)
   }, [routeId, sessions])
+
+  // Stop the in-flight turn. The abort path in `send` keeps the partial
+  // assistant text and just marks the bubble done.
+  const stop = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
 
   const newChat = useCallback(() => {
     if (routeId !== null) {
@@ -715,7 +720,7 @@ export default function ChatPage() {
           </div>
 
           {/* Composer */}
-          <Composer ready={ready && !blocked} streaming={streaming} placeholder={placeholder} onSend={send} />
+          <Composer ready={ready && !blocked} streaming={streaming} placeholder={placeholder} onSend={send} onStop={stop} />
         </Card>
       </div>
     </div>
@@ -727,11 +732,13 @@ function Composer({
   streaming,
   placeholder,
   onSend,
+  onStop,
 }: {
   ready: boolean
   streaming: boolean
   placeholder: string
   onSend: (content: string) => void
+  onStop: () => void
 }) {
   const [input, setInput] = useState('')
 
@@ -757,10 +764,17 @@ function Composer({
         disabled={!ready}
         className="flex-1 resize-none rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-[13px] leading-relaxed text-ink-100 placeholder:text-ink-500 transition-colors focus:border-accent focus:outline-none disabled:opacity-50"
       />
-      <Button onClick={submit} disabled={!ready || streaming || !input.trim()}>
-        {streaming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <SendHorizontal className="h-3.5 w-3.5" />}
-        Send
-      </Button>
+      {streaming ? (
+        <Button variant="outline" onClick={onStop}>
+          <Square className="h-3.5 w-3.5" />
+          Stop
+        </Button>
+      ) : (
+        <Button onClick={submit} disabled={!ready || !input.trim()}>
+          <SendHorizontal className="h-3.5 w-3.5" />
+          Send
+        </Button>
+      )}
     </div>
   )
 }

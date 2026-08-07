@@ -1,10 +1,16 @@
+import { lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, RequireAuth } from './components/AuthProvider'
 import DashboardLayout from './layouts/DashboardLayout'
 import LoginPage from './pages/login/LoginPage'
-import SessionList from './pages/sessions/SessionList'
-import ChatPage from './pages/chat/ChatPage'
-import AdminPage from './pages/admin/AdminPage'
+
+// Route-level code splitting: the authenticated pages (and their heavy deps,
+// e.g. react-markdown on the chat page) load as separate chunks. Login stays
+// eager — it is the landing page. The Suspense boundary lives in
+// DashboardLayout around the <Outlet />.
+const SessionList = lazy(() => import('./pages/sessions/SessionList'))
+const ChatPage = lazy(() => import('./pages/chat/ChatPage'))
+const AdminPage = lazy(() => import('./pages/admin/AdminPage'))
 
 export default function App() {
   return (

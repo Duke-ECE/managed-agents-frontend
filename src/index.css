@@ -210,3 +210,12 @@ html.theming, html.theming *, html.theming *::before, html.theming *::after {
 .stagger > *:nth-child(6) { animation-delay: 250ms; }
 .stagger > *:nth-child(7) { animation-delay: 300ms; }
 .stagger > *:nth-child(8) { animation-delay: 350ms; }
+.stagger > *:nth-child(8) { animation-delay: 350ms; }
+
+/* Assistant markdown: fenced blocks own their styling — strip the
+   inline-code pill from <code> inside <pre> (language-less fences). */
+pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
