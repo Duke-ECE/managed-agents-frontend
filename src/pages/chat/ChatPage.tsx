@@ -16,8 +16,10 @@ import {
   deleteSession,
   fetchMe,
   getTranscript,
+  listAgents,
   listSessions,
   streamSessionMessage,
+  type AgentTemplate,
   type DonePayload,
   type ErrorPayload,
   type MeInfo,
@@ -313,6 +315,12 @@ export default function ChatPage() {
   // degrade gracefully and let the backend be the gate.
   const [me, setMe] = useState<MeInfo | null>(null)
 
+  // Agent templates for the new-chat picker and the in-chat name badge.
+  // null = load in flight/failed — never block the chat on this.
+  const [agents, setAgents] = useState<AgentTemplate[] | null>(null)
+  // '' = "No agent" (ad-hoc LLM settings apply to a fresh chat).
+  const [selectedAgentId, setSelectedAgentId] = useState('')
+
   const [sessions, setSessions] = useState<SessionRecord[] | null>(null)
   const [sessionsError, setSessionsError] = useState<string | null>(null)
   const [titles, setTitles] = useState<Record<string, string>>({})
@@ -367,13 +375,33 @@ export default function ChatPage() {
     return () => { cancelled = true }
   }, [])
 
+  // Agent templates — best effort; powers the new-chat picker and resolves
+  // the open session's agent_id to a display name. Failures just hide both.
+  useEffect(() => {
+    let cancelled = false
+    listAgents()
+      .then((list) => { if (!cancelled) setAgents(list) })
+      .catch(() => { if (!cancelled) setAgents([]) })
+    return () => { cancelled = true }
+  }, [])
+
   // The platform default provider is gated on whitelist membership.
   const platformBlocked = me !== null && !me.can_use_platform_llm
 
-  // Surface the settings panel when the saved default mode can't be used.
+  // Resolve the open session's template to a name. A deleted template (or
+  // one missing from the list) simply shows no badge.
+  const sessionAgentId = routeId
+    ? (sessions?.find((s) => s.id === routeId)?.agent_id ?? '')
+    : selectedAgentId
+  const activeAgentName = sessionAgentId
+    ? agents?.find((a) => a.id === sessionAgentId)?.name
+    : undefined
+
+  // Surface the settings panel when the saved default mode can't be used
+  // (an agent template brings its own LLM, so it doesn't apply then).
   useEffect(() => {
-    if (platformBlocked && settings.mode === 'default') setSettingsOpen(true)
-  }, [platformBlocked, settings.mode])
+    if (platformBlocked && settings.mode === 'default' && !selectedAgentId) setSettingsOpen(true)
+  }, [platformBlocked, settings.mode, selectedAgentId])
 
   // Load the transcript whenever the URL picks a session. SWR: a cached
   // transcript renders instantly while the network copy revalidates in the
@@ -532,19 +560,28 @@ export default function ChatPage() {
         let sid = routeId
         if (!sid) {
           // First message of a fresh chat: create the session, then adopt its
-          // id in the URL so refresh restores the conversation.
-          const newId =
-            settings.mode === 'custom' && settings.apiKey
+          // id in the URL so refresh restores the conversation. With an agent
+          // template selected it governs the LLM/prompt/tools — the local LLM
+          // settings are not sent at all.
+          const newId = selectedAgentId
+            ? await createSession({ agentId: selectedAgentId })
+            : settings.mode === 'custom' && settings.apiKey
               ? await createSession({
-                  api_key: settings.apiKey,
-                  base_url: settings.baseUrl,
-                  model: settings.model,
+                  llm: {
+                    api_key: settings.apiKey,
+                    base_url: settings.baseUrl,
+                    model: settings.model,
+                  },
                 })
               : await createSession()
           sid = newId
           createdIdRef.current = newId
           const now = new Date().toISOString()
-          const record: SessionRecord = { id: newId, user_id: '', status: 'active', created_at: now, last_active: now }
+          const record: SessionRecord = {
+            id: newId, user_id: '', status: 'active',
+            agent_id: selectedAgentId || undefined,
+            created_at: now, last_active: now,
+          }
           setSessions((list) => [record, ...(list ?? [])])
           const title = text.slice(0, 40)
           setTitles((t) => ({ ...t, [newId]: title }))
@@ -609,10 +646,17 @@ export default function ChatPage() {
         abortRef.current = null
       }
     },
-    [routeId, settings, streaming, historyLoading, sessionEnded, sessionMissing, historyError, navigate],
+    [routeId, settings, selectedAgentId, streaming, historyLoading, sessionEnded, sessionMissing, historyError, navigate],
   )
 
-  const ready = settings.mode === 'default' ? !platformBlocked : Boolean(settings.apiKey)
+  // An agent template brings its own LLM (key stored server-side), so a fresh
+  // chat with one selected doesn't depend on the local LLM settings.
+  const agentSelected = !routeId && selectedAgentId !== ''
+  const ready = agentSelected
+    ? true
+    : settings.mode === 'default'
+      ? !platformBlocked
+      : Boolean(settings.apiKey)
   const blocked = sessionEnded || sessionMissing || historyError !== null || historyLoading
   const placeholder = sessionEnded
     ? 'This session has ended — start a new chat'
@@ -642,11 +686,34 @@ export default function ChatPage() {
           title="Chat"
           description="Talk to a managed agent over a live SSE stream."
           actions={
-            <Button variant="outline" size="sm" onClick={() => setSettingsOpen((o) => !o)}>
-              <Settings2 className="h-3.5 w-3.5" />
-              LLM settings
-              {!ready && <span className="rounded border border-warn-line bg-warn-soft px-1 font-mono text-[9px] uppercase text-warn">required</span>}
-            </Button>
+            <>
+              {/* Agent picker — new chats only; the template then governs the
+                  session's LLM, system prompt, and tools. */}
+              {!routeId && agents !== null && agents.length > 0 && (
+                <select
+                  value={selectedAgentId}
+                  onChange={(e) => setSelectedAgentId(e.target.value)}
+                  title="Agent template for the new chat"
+                  className="h-8 rounded-lg border border-ink-700 bg-ink-850 px-2 text-[12px] text-ink-100 transition-colors focus:border-accent focus:outline-none"
+                >
+                  <option value="">No agent</option>
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              )}
+              {activeAgentName && (
+                <span className="flex items-center gap-1.5 rounded-full border border-vio-line bg-vio-soft px-2.5 py-1 text-[11px] font-medium text-vio">
+                  <Bot className="h-3 w-3" />
+                  {activeAgentName}
+                </span>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setSettingsOpen((o) => !o)}>
+                <Settings2 className="h-3.5 w-3.5" />
+                LLM settings
+                {!ready && <span className="rounded border border-warn-line bg-warn-soft px-1 font-mono text-[9px] uppercase text-warn">required</span>}
+              </Button>
+            </>
           }
         />
 

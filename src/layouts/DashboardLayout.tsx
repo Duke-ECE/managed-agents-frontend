@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   MessagesSquare, MessageSquare, Terminal, Sun, Moon, Loader2,
-  PanelLeftOpen, PanelLeftClose, LogOut, ShieldCheck,
+  PanelLeftOpen, PanelLeftClose, LogOut, ShieldCheck, Bot,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '../utils/format'
@@ -21,12 +21,14 @@ interface NavItem {
 const navItems: NavItem[] = [
   { to: '/chat', label: 'Chat', icon: MessageSquare },
   { to: '/sessions', label: 'Sessions', icon: MessagesSquare },
+  { to: '/agents', label: 'Agents', icon: Bot },
 ]
 
 const breadcrumbMap: Record<string, string> = {
   chat: 'Chat',
   sessions: 'Sessions',
   admin: 'LLM Access',
+  agents: 'Agents',
 }
 
 /**
