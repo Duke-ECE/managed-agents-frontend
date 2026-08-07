@@ -217,6 +217,15 @@ export type LlmMode = 'platform_default' | 'custom'
 
 export const AGENT_TOOLS = ['read', 'write', 'bash', 'edit'] as const
 
+// "private" = owned by the user, full CRUD. "platform" = built-in, readable
+// and usable by everyone but read-only through the API (PATCH/DELETE → 404);
+// clone it to customize.
+export type AgentVisibility = 'private' | 'platform'
+
+// The seeded built-in template ("Default assistant"), also the chat picker's
+// default selection for users who may use the platform LLM.
+export const PLATFORM_AGENT_ID = 'a0000000-0000-0000-0000-000000000001'
+
 export interface AgentTemplate {
   id: string
   name: string
@@ -227,8 +236,13 @@ export interface AgentTemplate {
   llm_base_url: string
   llm_model: string
   tools: string[] // empty = all tools
+  visibility: AgentVisibility
   created_at: string
   updated_at: string
+}
+
+export function isPlatform(agent: AgentTemplate): boolean {
+  return agent.visibility === 'platform'
 }
 
 export interface AgentInput {

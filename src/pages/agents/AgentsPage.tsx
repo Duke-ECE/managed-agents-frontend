@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Bot, Pencil, Plus, ShieldX, Trash2, Wrench } from 'lucide-react'
+import { Bot, Copy, Eye, Pencil, Plus, ShieldX, Trash2, Wrench } from 'lucide-react'
 import {
   ApiError,
   deleteAgent,
   fetchMe,
+  isPlatform,
   listAgents,
   type AgentTemplate,
 } from '../../lib/chat-api'
@@ -12,7 +13,7 @@ import StatusBadge from '../../components/StatusBadge'
 import { PageHeader, Card, EmptyState, TableSkeleton } from '../../components/Primitives'
 import ConfirmDialog, { Button } from '../../components/ConfirmDialog'
 import { formatDateTime } from '../../utils/format'
-import AgentFormDrawer from './AgentFormDrawer'
+import AgentFormDrawer, { type AgentDrawerState } from './AgentFormDrawer'
 
 /**
  * Agent templates — named, reusable session configs (system prompt, LLM,
@@ -26,8 +27,8 @@ export default function AgentsPage() {
   // null = unknown (fetch failed or in flight); degrade to not-blocked and
   // let the backend be the gate.
   const [platformBlocked, setPlatformBlocked] = useState(false)
-  // Drawer state: undefined = closed, null = create, template = edit.
-  const [editing, setEditing] = useState<AgentTemplate | null | undefined>(undefined)
+  // Drawer state: undefined = closed.
+  const [drawer, setDrawer] = useState<AgentDrawerState | undefined>(undefined)
   const [deleting, setDeleting] = useState<AgentTemplate | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
 
@@ -78,7 +79,10 @@ export default function AgentsPage() {
       key: 'name', header: 'Agent',
       render: (a) => (
         <div className="leading-tight">
-          <div className="text-[13px] font-medium text-ink-50">{a.name}</div>
+          <div className="flex items-center gap-2">
+            <div className="text-[13px] font-medium text-ink-50">{a.name}</div>
+            {isPlatform(a) && <StatusBadge status="platform" label="Built-in" />}
+          </div>
           {a.description && (
             <div className="mt-0.5 max-w-72 truncate text-[11px] text-ink-500" title={a.description}>
               {a.description}
@@ -122,12 +126,26 @@ export default function AgentsPage() {
       key: 'actions', header: '',
       render: (a) => (
         <div className="flex items-center justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={() => setEditing(a)}>
-            <Pencil className="h-3.5 w-3.5" /> Edit
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setDeleting(a)}>
-            <Trash2 className="h-3.5 w-3.5" /> Delete
-          </Button>
+          {isPlatform(a) ? (
+            <>
+              {/* Built-in templates are read-only through the API — view or clone. */}
+              <Button variant="outline" size="sm" onClick={() => setDrawer({ kind: 'view', agent: a })}>
+                <Eye className="h-3.5 w-3.5" /> View
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setDrawer({ kind: 'clone', source: a })}>
+                <Copy className="h-3.5 w-3.5" /> Clone
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setDrawer({ kind: 'edit', agent: a })}>
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setDeleting(a)}>
+                <Trash2 className="h-3.5 w-3.5" /> Delete
+              </Button>
+            </>
+          )}
         </div>
       ),
     },
@@ -141,7 +159,7 @@ export default function AgentsPage() {
         title="Agents"
         description="Reusable agent templates: a system prompt, an LLM, and a tools whitelist. Select one when starting a chat."
         actions={
-          <Button onClick={() => setEditing(null)}>
+          <Button onClick={() => setDrawer({ kind: 'create' })}>
             <Plus className="h-4 w-4" /> New agent
           </Button>
         }
@@ -170,17 +188,18 @@ export default function AgentsPage() {
             icon={<Bot className="h-5 w-5" />}
             title="No agents yet"
             description="Create a template once, then start chats with it from the Chat page."
-            action={<Button onClick={() => setEditing(null)}><Plus className="h-4 w-4" /> New agent</Button>}
+            action={<Button onClick={() => setDrawer({ kind: 'create' })}><Plus className="h-4 w-4" /> New agent</Button>}
           />
         )}
       </Card>
 
       <AgentFormDrawer
-        open={editing !== undefined}
-        agent={editing ?? null}
+        open={drawer !== undefined}
+        state={drawer ?? { kind: 'create' }}
         platformBlocked={platformBlocked}
-        onClose={() => setEditing(undefined)}
+        onClose={() => setDrawer(undefined)}
         onSaved={() => void load()}
+        onClone={(source) => setDrawer({ kind: 'clone', source })}
       />
 
       <ConfirmDialog

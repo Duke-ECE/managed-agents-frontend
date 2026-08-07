@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Copy } from 'lucide-react'
 import {
   createAgent,
   updateAgent,
@@ -8,11 +9,12 @@ import {
   type LlmMode,
 } from '../../lib/chat-api'
 import Drawer from '../../components/Drawer'
+import StatusBadge from '../../components/StatusBadge'
 import { Button } from '../../components/ConfirmDialog'
 import { cn } from '../../utils/format'
 
 const inputCls =
-  'w-full rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-[13px] text-ink-100 placeholder:text-ink-500 outline-none transition-colors focus:border-accent'
+  'w-full rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-[13px] text-ink-100 placeholder:text-ink-500 outline-none transition-colors focus:border-accent disabled:opacity-60'
 const labelCls =
   'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400'
 
@@ -30,8 +32,26 @@ interface Draft {
   tools: string[]
 }
 
-function draftFrom(agent: AgentTemplate | null, platformBlocked: boolean): Draft {
-  if (!agent) {
+/**
+ * What the drawer shows. `view` is the read-only look at a platform
+ * (built-in) template; `clone` is a create pre-filled from a template — it
+ * never sends an id or visibility, so the result is a normal private
+ * template.
+ */
+export type AgentDrawerState =
+  | { kind: 'create' }
+  | { kind: 'edit'; agent: AgentTemplate }
+  | { kind: 'view'; agent: AgentTemplate }
+  | { kind: 'clone'; source: AgentTemplate }
+
+function draftFrom(state: AgentDrawerState, platformBlocked: boolean): Draft {
+  const source =
+    state.kind === 'edit' || state.kind === 'view'
+      ? state.agent
+      : state.kind === 'clone'
+        ? state.source
+        : null
+  if (!source) {
     return {
       name: '',
       description: '',
@@ -46,49 +66,52 @@ function draftFrom(agent: AgentTemplate | null, platformBlocked: boolean): Draft
     }
   }
   return {
-    name: agent.name,
-    description: agent.description,
-    systemPrompt: agent.system_prompt,
-    llmMode: agent.llm_mode,
+    name: state.kind === 'clone' ? `Copy of ${source.name}` : source.name,
+    description: source.description,
+    systemPrompt: source.system_prompt,
+    llmMode: source.llm_mode,
     apiKey: '',
-    baseUrl: agent.llm_base_url || DEFAULT_BASE_URL,
-    model: agent.llm_model || DEFAULT_MODEL,
+    baseUrl: source.llm_base_url || DEFAULT_BASE_URL,
+    model: source.llm_model || DEFAULT_MODEL,
     // An empty whitelist means "all tools" — render it as all four checked.
-    tools: agent.tools.length > 0 ? agent.tools : [...AGENT_TOOLS],
+    tools: source.tools.length > 0 ? source.tools : [...AGENT_TOOLS],
   }
 }
 
 /**
- * Create/edit form for an agent template. `agent` is null for create. The
- * stored API key is never readable: on edit an empty key field means "keep
- * the current key", and switching to platform_default clears it ("").
+ * Create/edit/view/clone form for an agent template. The stored API key is
+ * never readable: on edit an empty key field means "keep the current key",
+ * and switching to platform_default clears it (""). A clone therefore needs
+ * a fresh key when the source used a custom LLM.
  */
 export default function AgentFormDrawer({
   open,
-  agent,
+  state,
   platformBlocked,
   onClose,
   onSaved,
+  onClone,
 }: {
   open: boolean
-  agent: AgentTemplate | null
+  state: AgentDrawerState
   platformBlocked: boolean
   onClose: () => void
   onSaved: () => void
+  onClone: (source: AgentTemplate) => void
 }) {
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(agent, platformBlocked))
+  const [draft, setDraft] = useState<Draft>(() => draftFrom(state, platformBlocked))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // The submit button lives in the drawer footer, outside the <form>.
   const formRef = useRef<HTMLFormElement>(null)
 
-  // Re-key the draft whenever the drawer is (re)opened for another agent.
+  // Re-key the draft whenever the drawer is (re)opened for another state.
   useEffect(() => {
     if (open) {
-      setDraft(draftFrom(agent, platformBlocked))
+      setDraft(draftFrom(state, platformBlocked))
       setError(null)
     }
-  }, [open, agent, platformBlocked])
+  }, [open, state, platformBlocked])
 
   const toggleTool = (tool: string) =>
     setDraft((d) => ({
@@ -96,8 +119,13 @@ export default function AgentFormDrawer({
       tools: d.tools.includes(tool) ? d.tools.filter((t) => t !== tool) : [...d.tools, tool],
     }))
 
+  const readOnly = state.kind === 'view'
+  // Only an existing private template is PATCHed; create and clone both POST.
+  const editAgent = state.kind === 'edit' ? state.agent : null
+
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    if (readOnly) return
     setError(null)
     setSubmitting(true)
     try {
@@ -114,11 +142,11 @@ export default function AgentFormDrawer({
       if (draft.llmMode === 'platform_default') {
         // Clear any stored key (only valid together with platform_default).
         input.llm_api_key = ''
-      } else if (!agent || draft.apiKey) {
-        // Create always sends the key; on edit an empty field keeps it.
+      } else if (!editAgent || draft.apiKey) {
+        // Create/clone always sends the key; on edit an empty field keeps it.
         input.llm_api_key = draft.apiKey
       }
-      if (agent) await updateAgent(agent.id, input)
+      if (editAgent) await updateAgent(editAgent.id, input)
       else await createAgent(input)
       onSaved()
       onClose()
@@ -129,28 +157,64 @@ export default function AgentFormDrawer({
     }
   }
 
-  const keyRequired = draft.llmMode === 'custom' && !agent
+  const keyRequired = draft.llmMode === 'custom' && !editAgent
+
+  const title =
+    state.kind === 'edit' ? (
+      `Edit ${state.agent.name}`
+    ) : state.kind === 'view' ? (
+      <span className="flex items-center gap-2">
+        {state.agent.name}
+        <StatusBadge status="platform" label="Built-in" />
+      </span>
+    ) : state.kind === 'clone' ? (
+      `Clone ${state.source.name}`
+    ) : (
+      'New agent'
+    )
 
   return (
     <Drawer
       open={open}
       onClose={onClose}
-      title={agent ? `Edit ${agent.name}` : 'New agent'}
+      title={title}
       width="max-w-xl"
       footer={
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => formRef.current?.requestSubmit()} disabled={submitting}>
-            {submitting ? 'Saving…' : agent ? 'Save changes' : 'Create agent'}
-          </Button>
-        </div>
+        readOnly ? (
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>Close</Button>
+            <Button onClick={() => state.kind === 'view' && onClone(state.agent)}>
+              <Copy className="h-3.5 w-3.5" /> Clone
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button onClick={() => formRef.current?.requestSubmit()} disabled={submitting}>
+              {submitting
+                ? 'Saving…'
+                : state.kind === 'edit'
+                  ? 'Save changes'
+                  : state.kind === 'clone'
+                    ? 'Create clone'
+                    : 'Create agent'}
+            </Button>
+          </div>
+        )
       }
     >
       <form ref={formRef} onSubmit={(e) => void submit(e)} className="space-y-5">
+        {readOnly && (
+          <p className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-2.5 text-[12px] text-ink-400">
+            Built-in platform template — read-only. Clone it to customize your own copy.
+          </p>
+        )}
+
         <div>
           <label className={labelCls}>Name</label>
           <input
             required
+            disabled={readOnly}
             className={inputCls}
             value={draft.name}
             onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
@@ -162,6 +226,7 @@ export default function AgentFormDrawer({
         <div>
           <label className={labelCls}>Description</label>
           <input
+            disabled={readOnly}
             className={inputCls}
             value={draft.description}
             onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
@@ -173,6 +238,7 @@ export default function AgentFormDrawer({
         <div>
           <label className={labelCls}>System prompt</label>
           <textarea
+            disabled={readOnly}
             className={cn(inputCls, 'h-28 resize-none leading-relaxed')}
             value={draft.systemPrompt}
             onChange={(e) => setDraft((d) => ({ ...d, systemPrompt: e.target.value }))}
@@ -187,7 +253,7 @@ export default function AgentFormDrawer({
               <button
                 key={mode}
                 type="button"
-                disabled={platformBlocked && mode === 'platform_default'}
+                disabled={readOnly || (platformBlocked && mode === 'platform_default')}
                 onClick={() => setDraft((d) => ({ ...d, llmMode: mode }))}
                 className={cn(
                   'h-8 rounded-lg border px-3 text-[12px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
@@ -217,10 +283,11 @@ export default function AgentFormDrawer({
                 <input
                   type="password"
                   required={keyRequired}
+                  disabled={readOnly}
                   className={inputCls}
                   value={draft.apiKey}
                   onChange={(e) => setDraft((d) => ({ ...d, apiKey: e.target.value }))}
-                  placeholder={agent ? 'leave empty to keep current key' : 'sk-…'}
+                  placeholder={editAgent ? 'leave empty to keep current key' : 'sk-…'}
                   autoComplete="off"
                 />
               </div>
@@ -229,6 +296,7 @@ export default function AgentFormDrawer({
                   <label className={labelCls}>Base URL</label>
                   <input
                     required
+                    disabled={readOnly}
                     className={inputCls}
                     value={draft.baseUrl}
                     onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value }))}
@@ -240,6 +308,7 @@ export default function AgentFormDrawer({
                   <label className={labelCls}>Model</label>
                   <input
                     required
+                    disabled={readOnly}
                     className={inputCls}
                     value={draft.model}
                     onChange={(e) => setDraft((d) => ({ ...d, model: e.target.value }))}
@@ -267,11 +336,13 @@ export default function AgentFormDrawer({
                     checked
                       ? 'border-accent bg-info-soft text-accent-fg'
                       : 'border-ink-700 bg-ink-850 text-ink-300 hover:border-ink-600',
+                    readOnly && 'pointer-events-none opacity-60',
                   )}
                 >
                   <input
                     type="checkbox"
                     checked={checked}
+                    disabled={readOnly}
                     onChange={() => toggleTool(tool)}
                     className="accent-accent"
                   />

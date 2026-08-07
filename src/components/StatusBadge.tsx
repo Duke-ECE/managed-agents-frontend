@@ -27,6 +27,8 @@ const statusToneMap: Record<string, Tone> = {
   admin: 'purple', member: 'blue', guest: 'gray',
   // agent template llm_mode
   platform_default: 'blue', custom: 'cyan',
+  // agent template visibility
+  platform: 'purple',
 }
 
 const liveStatuses = new Set(['running', 'online', 'busy', 'active', 'creating', 'retrying'])

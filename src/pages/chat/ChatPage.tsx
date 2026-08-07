@@ -16,9 +16,11 @@ import {
   deleteSession,
   fetchMe,
   getTranscript,
+  isPlatform,
   listAgents,
   listSessions,
   streamSessionMessage,
+  PLATFORM_AGENT_ID,
   type AgentTemplate,
   type DonePayload,
   type ErrorPayload,
@@ -388,6 +390,19 @@ export default function ChatPage() {
   // The platform default provider is gated on whitelist membership.
   const platformBlocked = me !== null && !me.can_use_platform_llm
 
+  // Default-select the built-in template on a fresh /chat — but only for
+  // users who may use the platform LLM (the built-in is platform_default, so
+  // anyone else would 403 on send; they keep "No agent"). Once only, so a
+  // later manual choice is never overridden.
+  const defaultAgentPickedRef = useRef(false)
+  useEffect(() => {
+    if (routeId || defaultAgentPickedRef.current || !agents || !me?.can_use_platform_llm) return
+    defaultAgentPickedRef.current = true
+    const builtin =
+      agents.find((a) => a.id === PLATFORM_AGENT_ID) ?? agents.find((a) => isPlatform(a))
+    if (builtin) setSelectedAgentId(builtin.id)
+  }, [routeId, agents, me])
+
   // Resolve the open session's template to a name. A deleted template (or
   // one missing from the list) simply shows no badge.
   const sessionAgentId = routeId
@@ -697,9 +712,20 @@ export default function ChatPage() {
                   className="h-8 rounded-lg border border-ink-700 bg-ink-850 px-2 text-[12px] text-ink-100 transition-colors focus:border-accent focus:outline-none"
                 >
                   <option value="">No agent</option>
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))}
+                  {agents.map((a) => {
+                    // platform_default templates need platform-LLM access;
+                    // without it they would 403 on send — disable them.
+                    const gated = platformBlocked && a.llm_mode === 'platform_default'
+                    const label =
+                      a.name +
+                      (isPlatform(a) ? ' (built-in)' : '') +
+                      (gated ? ' — use a custom key or ask an admin' : '')
+                    return (
+                      <option key={a.id} value={a.id} disabled={gated}>
+                        {label}
+                      </option>
+                    )
+                  })}
                 </select>
               )}
               {activeAgentName && (
