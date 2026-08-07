@@ -126,6 +126,56 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await throwIfNotOk(res)
 }
 
+/** GET /api/me — account info and capability flags for the signed-in user. */
+export interface MeInfo {
+  user_id: string
+  email: string
+  can_use_platform_llm: boolean
+  is_admin: boolean
+}
+
+export async function fetchMe(): Promise<MeInfo> {
+  const res = await fetch(`${API_BASE}/api/me`, {
+    headers: await authHeaders(),
+  })
+  await throwIfNotOk(res)
+  return (await res.json()) as MeInfo
+}
+
+// Admin whitelist management (/api/admin/members — 403 for non-admins).
+export interface Member {
+  email: string
+  role: string // "admin" | "member"
+  added_by: string
+  created_at: string
+}
+
+export async function listMembers(): Promise<Member[]> {
+  const res = await fetch(`${API_BASE}/api/admin/members`, {
+    headers: await authHeaders(),
+  })
+  await throwIfNotOk(res)
+  const data = (await res.json()) as { members?: Member[] }
+  return data.members ?? []
+}
+
+export async function upsertMember(email: string, role: 'admin' | 'member'): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/admin/members`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify({ email, role }),
+  })
+  await throwIfNotOk(res)
+}
+
+export async function removeMember(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/admin/members/${encodeURIComponent(email)}`, {
+    method: 'DELETE',
+    headers: await authHeaders(),
+  })
+  await throwIfNotOk(res)
+}
+
 export async function listSessions(): Promise<SessionRecord[]> {
   const res = await fetch(`${API_BASE}/api/sessions`, {
     headers: await authHeaders(),

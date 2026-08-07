@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Github, Loader2 } from 'lucide-react'
 import { BrandMark, RedirectIfAuthed } from '../../components/AuthProvider'
 import { Button } from '../../components/ConfirmDialog'
 import { Card } from '../../components/Primitives'
-import { signInWithGitHub, signInWithPassword } from '../../lib/auth'
+import { consumeOAuthRedirect, signInWithGitHub, signInWithPassword } from '../../lib/auth'
 
 const inputCls =
   'h-9 w-full rounded-lg border border-ink-700 bg-ink-850 px-3 text-[13px] text-ink-100 placeholder:text-ink-500 transition-colors focus:border-accent focus:outline-none'
@@ -16,12 +17,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [signingIn, setSigningIn] = useState(false)
+  const location = useLocation()
+  // Where the route guard bounced the user from (deep-link), else the chat.
+  const from = (location.state as { from?: { pathname: string; search?: string } } | null)?.from
+  const intendedPath = from ? from.pathname + (from.search ?? '') : '/chat'
 
   const signInWithEmail = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
     setSigningIn(true)
     try {
+      // Drop any stale OAuth deep-link so this login lands on the home page.
+      consumeOAuthRedirect()
       // On success the AuthProvider session listener routes the user in.
       await signInWithPassword(email.trim(), password)
     } catch (err) {
@@ -34,8 +41,9 @@ export default function LoginPage() {
     setError(null)
     setSigningIn(true)
     try {
-      // Redirects the browser to GitHub; only rejects on immediate failure.
-      await signInWithGitHub()
+      // Redirects the browser to GitHub; only rejects on immediate failure
+      // (e.g. the provider is not configured in Supabase yet).
+      await signInWithGitHub(intendedPath)
     } catch (err) {
       setSigningIn(false)
       setError(err instanceof Error ? err.message : String(err))

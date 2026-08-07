@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AlertTriangle, Loader2, Terminal } from 'lucide-react'
 import type { Session } from '@supabase/supabase-js'
-import { authConfigured, getSession, onAuthChange } from '../lib/auth'
+import { authConfigured, consumeOAuthRedirect, getSession, onAuthChange } from '../lib/auth'
 
 interface AuthState {
   session: Session | null
@@ -17,6 +17,7 @@ export function useAuth(): AuthState {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ session: null, loading: true })
+  const navigate = useNavigate()
 
   useEffect(() => {
     let active = true
@@ -31,6 +32,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsubscribe()
     }
   }, [])
+
+  // OAuth deep-link: a path stored before the GitHub redirect is consumed
+  // once a session exists, sending the user where they were headed.
+  useEffect(() => {
+    if (!state.session) return
+    const path = consumeOAuthRedirect()
+    if (path) navigate(path, { replace: true })
+  }, [state.session, navigate])
 
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>
 }

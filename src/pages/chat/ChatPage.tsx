@@ -13,11 +13,13 @@ import {
   ApiError,
   createSession,
   deleteSession,
+  fetchMe,
   getTranscript,
   listSessions,
   streamSessionMessage,
   type DonePayload,
   type ErrorPayload,
+  type MeInfo,
   type SessionRecord,
   type TextDeltaPayload,
   type ToolCallPayload,
@@ -117,9 +119,11 @@ function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number):
 
 function SettingsPanel({
   settings,
+  platformBlocked,
   onSave,
 }: {
   settings: LlmSettings
+  platformBlocked: boolean
   onSave: (next: LlmSettings) => void
 }) {
   const [draft, setDraft] = useState(settings)
@@ -145,9 +149,10 @@ function SettingsPanel({
             <button
               key={m}
               type="button"
+              disabled={platformBlocked && m === 'default'}
               onClick={() => setDraft((d) => ({ ...d, mode: m }))}
               className={cn(
-                'h-8 rounded-lg border px-3 text-[12px] font-medium transition-colors',
+                'h-8 rounded-lg border px-3 text-[12px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
                 draft.mode === m
                   ? 'border-accent bg-accent/10 text-ink-100'
                   : 'border-ink-700 bg-ink-850 text-ink-400 hover:text-ink-200',
@@ -158,9 +163,15 @@ function SettingsPanel({
           ))}
         </div>
         {draft.mode === 'default' ? (
+          platformBlocked ? (
+            <p className="rounded-lg border border-warn-line bg-warn-soft px-3 py-2.5 text-[12px] text-warn">
+              Platform provider not enabled for your account — use a custom key or ask an admin.
+            </p>
+          ) : (
           <p className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-2.5 text-[12px] text-ink-400">
             OpenRouter · openai/gpt-oss-20b:free — provided by the platform, no API key needed.
           </p>
+          )
         ) : (
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="block">
@@ -299,6 +310,9 @@ export default function ChatPage() {
     const s = loadSettings()
     return s.mode === 'custom' && !s.apiKey
   })
+  // /api/me capability flags. null = unknown (fetch failed or in flight) —
+  // degrade gracefully and let the backend be the gate.
+  const [me, setMe] = useState<MeInfo | null>(null)
 
   const [sessions, setSessions] = useState<SessionRecord[] | null>(null)
   const [sessionsError, setSessionsError] = useState<string | null>(null)
@@ -344,6 +358,23 @@ export default function ChatPage() {
       .catch((err) => { if (!cancelled) setSessionsError(err instanceof Error ? err.message : String(err)) })
     return () => { cancelled = true }
   }, [])
+
+  // Capability flags — best effort; a network failure must not block custom-key chatting.
+  useEffect(() => {
+    let cancelled = false
+    fetchMe()
+      .then((info) => { if (!cancelled) setMe(info) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  // The platform default provider is gated on whitelist membership.
+  const platformBlocked = me !== null && !me.can_use_platform_llm
+
+  // Surface the settings panel when the saved default mode can't be used.
+  useEffect(() => {
+    if (platformBlocked && settings.mode === 'default') setSettingsOpen(true)
+  }, [platformBlocked, settings.mode])
 
   // Load the transcript whenever the URL picks a session. SWR: a cached
   // transcript renders instantly while the network copy revalidates in the
@@ -576,7 +607,7 @@ export default function ChatPage() {
     [routeId, settings, streaming, historyLoading, sessionEnded, sessionMissing, historyError, navigate],
   )
 
-  const ready = settings.mode === 'default' || Boolean(settings.apiKey)
+  const ready = settings.mode === 'default' ? !platformBlocked : Boolean(settings.apiKey)
   const blocked = sessionEnded || sessionMissing || historyError !== null || historyLoading
   const placeholder = sessionEnded
     ? 'This session has ended — start a new chat'
@@ -584,7 +615,9 @@ export default function ChatPage() {
       ? 'This chat is unavailable'
       : ready
         ? 'Message… (Enter to send, Shift+Enter for newline)'
-        : 'Configure your LLM settings first'
+        : platformBlocked && settings.mode === 'default'
+          ? 'Platform provider not enabled — set a custom key in LLM settings'
+          : 'Configure your LLM settings first'
 
   return (
     <div className="flex h-full gap-6">
@@ -612,7 +645,7 @@ export default function ChatPage() {
           }
         />
 
-        {settingsOpen && <SettingsPanel key={settings.apiKey + settings.baseUrl + settings.model} settings={settings} onSave={saveSettings} />}
+        {settingsOpen && <SettingsPanel key={settings.apiKey + settings.baseUrl + settings.model} settings={settings} platformBlocked={platformBlocked} onSave={saveSettings} />}
 
         {sessionEnded && (
           <div className="mb-4 flex items-center gap-3 rounded-xl border border-warn-line bg-warn-soft px-4 py-3 text-[13px] text-warn animate-fade-in">

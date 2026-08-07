@@ -23,6 +23,8 @@ const statusToneMap: Record<string, Tone> = {
   pending: 'gray', retrying: 'amber', failed: 'red', cancelled: 'gray',
   // orchestration
   draft: 'gray', paused: 'amber',
+  // member role
+  admin: 'purple', member: 'blue',
 }
 
 const liveStatuses = new Set(['running', 'online', 'busy', 'active', 'creating', 'retrying'])

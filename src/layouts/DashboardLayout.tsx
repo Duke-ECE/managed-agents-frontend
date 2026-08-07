@@ -1,16 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Box, Bot, MessagesSquare, MessageSquare, ListTodo,
   Workflow, Search, Terminal, Bell, Sun, Moon,
-  PanelLeftOpen, PanelLeftClose, LogOut,
+  PanelLeftOpen, PanelLeftClose, LogOut, ShieldCheck,
+  type LucideIcon,
 } from 'lucide-react'
 import { cn } from '../utils/format'
 import { useTheme } from '../hooks/useTheme'
 import { useAuth } from '../components/AuthProvider'
 import { signOut } from '../lib/auth'
+import { fetchMe } from '../lib/chat-api'
 
-const navItems = [
+interface NavItem {
+  to: string
+  label: string
+  icon: LucideIcon
+  end?: boolean
+}
+
+const navItems: NavItem[] = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/sandboxes', label: 'Sandboxes', icon: Box },
   { to: '/agents', label: 'Agents', icon: Bot },
@@ -28,13 +37,14 @@ const breadcrumbMap: Record<string, string> = {
   chat: 'Chat',
   tasks: 'Tasks',
   orchestrations: 'Orchestrations',
+  admin: 'Admin',
 }
 
 /**
  * The sidebar — docked on the left when open, tucked fully off-screen when
  * closed. One click on the top-left toggle switches between the two.
  */
-function Sidebar({ open }: { open: boolean }) {
+function Sidebar({ open, isAdmin }: { open: boolean; isAdmin: boolean }) {
   const { session } = useAuth()
   const user = session?.user
   const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>
@@ -67,7 +77,7 @@ function Sidebar({ open }: { open: boolean }) {
       {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         <div className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">Platform</div>
-        {navItems.map(({ to, label, icon: Icon, end }) => (
+        {[...navItems, ...(isAdmin ? [{ to: '/admin', label: 'Admin', icon: ShieldCheck }] : [])].map(({ to, label, icon: Icon, end }: NavItem) => (
           <NavLink
             key={to}
             to={to}
@@ -206,10 +216,21 @@ function Header({
 export default function DashboardLayout() {
   const [open, setOpen] = useState(true)
   const { theme, toggleTheme } = useTheme()
+  // The nav item is cosmetic — the backend's /api/admin/* routes are the gate.
+  // A failed /api/me (network) just hides the item.
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchMe()
+      .then((me) => { if (!cancelled) setIsAdmin(me.is_admin) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div className="app-canvas min-h-screen">
-      <Sidebar open={open} />
+      <Sidebar open={open} isAdmin={isAdmin} />
 
       {/* Foreground: the floating, rounded content panel */}
       <div className={cn('transition-[padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]', open ? 'pl-60' : 'pl-0')}>

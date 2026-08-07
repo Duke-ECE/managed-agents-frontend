@@ -22,13 +22,30 @@ export async function getSession(): Promise<Session | null> {
   return data.session
 }
 
-export async function signInWithGitHub(): Promise<void> {
+const OAUTH_REDIRECT_KEY = 'managed-agents.oauth-redirect'
+
+export async function signInWithGitHub(redirectPath = '/chat'): Promise<void> {
   if (!supabase) return
+  // The OAuth round-trip drops the SPA's router state, so the intended
+  // destination survives in sessionStorage; AuthProvider consumes it once a
+  // session appears. It is also encoded in redirectTo so an allow-listed
+  // Supabase setup lands on the page directly.
+  sessionStorage.setItem(OAUTH_REDIRECT_KEY, redirectPath)
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'github',
-    options: { redirectTo: window.location.origin },
+    options: { redirectTo: window.location.origin + redirectPath },
   })
-  if (error) throw error
+  if (error) {
+    sessionStorage.removeItem(OAUTH_REDIRECT_KEY)
+    throw error
+  }
+}
+
+/** Read and clear the path stored before the OAuth redirect, if any. */
+export function consumeOAuthRedirect(): string | null {
+  const path = sessionStorage.getItem(OAUTH_REDIRECT_KEY)
+  if (path) sessionStorage.removeItem(OAUTH_REDIRECT_KEY)
+  return path
 }
 
 export async function signInWithPassword(email: string, password: string): Promise<void> {

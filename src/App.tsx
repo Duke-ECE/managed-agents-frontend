@@ -13,6 +13,7 @@ import TaskList from './pages/tasks/TaskList'
 import OrchestrationList from './pages/orchestrations/OrchestrationList'
 import OrchestrationDetail from './pages/orchestrations/OrchestrationDetail'
 import ChatPage from './pages/chat/ChatPage'
+import AdminPage from './pages/admin/AdminPage'
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="/tasks" element={<TaskList />} />
             <Route path="/orchestrations" element={<OrchestrationList />} />
             <Route path="/orchestrations/:id" element={<OrchestrationDetail />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Route>
         </Routes>
       </AuthProvider>
