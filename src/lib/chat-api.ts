@@ -168,6 +168,27 @@ export async function upsertMember(email: string, role: 'admin' | 'member'): Pro
   await throwIfNotOk(res)
 }
 
+// Admin user directory (/api/admin/users — 403 for non-admins). Every
+// registered auth user appears; role "guest" means no whitelist row.
+// Pre-granted whitelist rows without an auth account appear with empty
+// provider/last_sign_in_at.
+export interface AdminUser {
+  email: string
+  role: string // "guest" | "member" | "admin"
+  provider: string // "github" | "email" | "" (no auth account yet)
+  last_sign_in_at: string // "" when the user has never signed in
+  created_at: string
+}
+
+export async function listAdminUsers(): Promise<AdminUser[]> {
+  const res = await fetch(`${API_BASE}/api/admin/users`, {
+    headers: await authHeaders(),
+  })
+  await throwIfNotOk(res)
+  const data = (await res.json()) as { users?: AdminUser[] }
+  return data.users ?? []
+}
+
 export async function removeMember(email: string): Promise<void> {
   const res = await fetch(`${API_BASE}/api/admin/members/${encodeURIComponent(email)}`, {
     method: 'DELETE',

@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { ShieldCheck, ShieldX, Trash2, UserPlus } from 'lucide-react'
+import { ShieldCheck, ShieldX, UserPlus } from 'lucide-react'
 import {
   ApiError,
-  listMembers,
+  listAdminUsers,
   removeMember,
   upsertMember,
-  type Member,
+  type AdminUser,
 } from '../../lib/chat-api'
 import DataTable, { type Column } from '../../components/DataTable'
 import StatusBadge from '../../components/StatusBadge'
 import { PageHeader, Card, EmptyState, TableSkeleton } from '../../components/Primitives'
-import ConfirmDialog, { Button } from '../../components/ConfirmDialog'
-import { formatDateTime } from '../../utils/format'
+import { Button } from '../../components/ConfirmDialog'
+import { formatDateTime, timeAgo } from '../../utils/format'
 
 const inputCls =
   'h-9 w-full rounded-lg border border-ink-700 bg-ink-850 px-3 text-[13px] text-ink-100 placeholder:text-ink-500 transition-colors focus:border-accent focus:outline-none'
@@ -19,29 +19,31 @@ const inputCls =
 const labelCls =
   'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400'
 
+type RoleChoice = 'guest' | 'member' | 'admin'
+
 /**
- * Platform LLM access control — members may chat with the platform-provided
- * LLM key, everyone else configures their own. This is NOT login
- * permission: sign-in is open to any GitHub account. The backend is the
- * real gate; this page only renders what /api/admin/members allows
- * (403/401 → no-permission state).
+ * Platform LLM access control — lists every registered user and lets an
+ * admin change roles directly. "guest" (default) means no whitelist row and
+ * no platform LLM access; members chat key-free, everyone else configures
+ * their own API key. This is NOT login permission: sign-in is open to any
+ * GitHub account. The backend is the real gate; this page only renders what
+ * /api/admin/users allows (403/401 → no-permission state).
  */
 export default function AdminPage() {
-  const [members, setMembers] = useState<Member[] | null>(null)
+  const [users, setUsers] = useState<AdminUser[] | null>(null)
   const [loadError, setLoadError] = useState<{ status: number | null; message: string } | null>(null)
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'admin' | 'member'>('member')
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [removeTarget, setRemoveTarget] = useState<Member | null>(null)
-  const [removing, setRemoving] = useState(false)
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoadError(null)
     try {
-      setMembers(await listMembers())
+      setUsers(await listAdminUsers())
     } catch (err) {
-      setMembers(null)
+      setUsers(null)
       setLoadError({
         status: err instanceof ApiError ? err.status : null,
         message: err instanceof Error ? err.message : String(err),
@@ -67,47 +69,61 @@ export default function AdminPage() {
     }
   }
 
-  const confirmRemove = async () => {
-    if (!removeTarget) return
-    setRemoving(true)
+  const changeRole = async (user: AdminUser, next: RoleChoice) => {
+    if (next === user.role || pendingEmail !== null) return
+    setPendingEmail(user.email)
+    setLoadError(null)
     try {
-      await removeMember(removeTarget.email)
-      setRemoveTarget(null)
+      if (next === 'guest') await removeMember(user.email)
+      else await upsertMember(user.email, next)
       await load()
     } catch (err) {
-      setRemoveTarget(null)
       setLoadError({
         status: err instanceof ApiError ? err.status : null,
         message: err instanceof Error ? err.message : String(err),
       })
     } finally {
-      setRemoving(false)
+      setPendingEmail(null)
     }
   }
 
-  const columns: Column<Member>[] = [
+  const columns: Column<AdminUser>[] = [
     {
       key: 'email', header: 'Email',
-      render: (m) => <span className="font-mono text-[12px] font-medium text-ink-50">{m.email}</span>,
-    },
-    { key: 'role', header: 'Role', render: (m) => <StatusBadge status={m.role} /> },
-    {
-      key: 'addedBy', header: 'Added by',
-      render: (m) => <span className="font-mono text-[12px] text-ink-300">{m.added_by || '—'}</span>,
+      render: (u) => <span className="font-mono text-[12px] font-medium text-ink-50">{u.email}</span>,
     },
     {
-      key: 'created', header: 'Added',
-      render: (m) => <span className="text-[12px] text-ink-400">{formatDateTime(m.created_at)}</span>,
+      key: 'provider', header: 'Provider',
+      render: (u) =>
+        u.provider
+          ? <StatusBadge status={u.provider} />
+          : <span className="text-[12px] text-ink-500">—</span>,
     },
     {
-      key: 'actions', header: '',
-      render: (m) => (
-        <div className="flex items-center justify-end">
-          <Button variant="ghost" size="sm" onClick={() => setRemoveTarget(m)}>
-            <Trash2 className="h-3.5 w-3.5" /> Remove
-          </Button>
-        </div>
+      key: 'role', header: 'Role',
+      render: (u) => (
+        <select
+          value={u.role}
+          disabled={pendingEmail === u.email}
+          onChange={(e) => void changeRole(u, e.target.value as RoleChoice)}
+          className="h-8 rounded-lg border border-ink-700 bg-ink-850 px-2 text-[12px] text-ink-100 transition-colors focus:border-accent focus:outline-none disabled:opacity-50"
+        >
+          <option value="guest">guest</option>
+          <option value="member">member</option>
+          <option value="admin">admin</option>
+        </select>
       ),
+    },
+    {
+      key: 'lastSignIn', header: 'Last sign-in',
+      render: (u) =>
+        u.last_sign_in_at
+          ? <span className="text-[12px] text-ink-400">{timeAgo(u.last_sign_in_at)}</span>
+          : <span className="text-[12px] text-ink-500">never</span>,
+    },
+    {
+      key: 'created', header: 'Created',
+      render: (u) => <span className="text-[12px] text-ink-400">{formatDateTime(u.created_at)}</span>,
     },
   ]
 
@@ -117,7 +133,7 @@ export default function AdminPage() {
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
         title="LLM Access"
-        description="Who may use the platform-provided LLM key. Members chat key-free; everyone else configures their own API key. Sign-in is open to any GitHub account — this list does not control login."
+        description="Everyone who has signed in, with their platform LLM access. Guests (the default) configure their own API key; members and admins chat key-free. Sign-in is open to any GitHub account — this list does not control login."
       />
 
       {noPermission ? (
@@ -128,7 +144,7 @@ export default function AdminPage() {
         />
       ) : (
         <>
-          {/* Add member */}
+          {/* Pre-grant access before a user's first login */}
           <Card className="mb-4 p-5 animate-fade-up">
             <form onSubmit={addMember} className="flex flex-wrap items-end gap-4">
               <label className="block min-w-56 flex-1">
@@ -166,39 +182,29 @@ export default function AdminPage() {
             )}
           </Card>
 
-          {/* Members table */}
+          {/* Users table */}
           <Card className="overflow-hidden animate-fade-up">
-            {members === null && !loadError ? (
-              <TableSkeleton rows={4} cols={4} />
+            {users === null && !loadError ? (
+              <TableSkeleton rows={4} cols={5} />
             ) : loadError ? (
               <EmptyState
                 icon={<ShieldCheck className="h-5 w-5" />}
-                title="Failed to load members"
+                title="Failed to load users"
                 description={loadError.message}
                 action={<Button variant="outline" size="sm" onClick={() => void load()}>Retry</Button>}
               />
-            ) : members !== null && members.length > 0 ? (
-              <DataTable columns={columns} rows={members} rowKey={(m) => m.email} />
+            ) : users !== null && users.length > 0 ? (
+              <DataTable columns={columns} rows={users} rowKey={(u) => u.email} />
             ) : (
               <EmptyState
                 icon={<ShieldCheck className="h-5 w-5" />}
-                title="No members yet"
-                description="Add the first member with the form above."
+                title="No users yet"
+                description="Users appear here after their first sign-in; you can also pre-grant access with the form above."
               />
             )}
           </Card>
         </>
       )}
-
-      <ConfirmDialog
-        open={removeTarget !== null}
-        title="Remove member"
-        message={`Remove ${removeTarget?.email ?? ''}? They lose platform LLM access${removeTarget?.role === 'admin' ? ' and admin rights' : ''} immediately.`}
-        confirmLabel={removing ? 'Removing…' : 'Remove'}
-        danger
-        onConfirm={() => void confirmRemove()}
-        onCancel={() => setRemoveTarget(null)}
-      />
     </div>
   )
 }
