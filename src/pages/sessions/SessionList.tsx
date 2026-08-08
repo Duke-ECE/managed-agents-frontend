@@ -12,6 +12,8 @@ import { timeAgo, formatDateTime, cn } from '../../utils/format'
 
 const STATUS_FILTERS = ['all', 'active', 'ended'] as const
 
+const PAGE_SIZE = 50
+
 const TIME_RANGES = [
   { key: 'all', label: 'All time', ms: Infinity },
   { key: '1h', label: 'Last hour', ms: 3_600_000 },
@@ -22,14 +24,39 @@ const TIME_RANGES = [
 /** Sessions owned by the signed-in user, live from the managed-agents backend. */
 export default function SessionList() {
   const navigate = useNavigate()
-  const { data: fetched, loading, error, reload } = useAsync(() => listSessions())
+  const { data: fetched, loading, error, reload } = useAsync(() => listSessions({ limit: PAGE_SIZE }))
   // Local copy so "End" can update a row without a full reload flash.
   const [sessions, setSessions] = useState<SessionRecord[] | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [endingId, setEndingId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('all')
   const [timeFilter, setTimeFilter] = useState<string>('all')
 
-  useEffect(() => { if (fetched) setSessions(fetched) }, [fetched])
+  useEffect(() => {
+    if (fetched) {
+      setSessions(fetched.sessions)
+      setHasMore(fetched.has_more)
+    }
+  }, [fetched])
+
+  // Append the next page (deduped by id). Filters/sorting stay client-side
+  // over the loaded rows.
+  const loadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const page = await listSessions({ limit: PAGE_SIZE, offset: sessions?.length ?? 0 })
+      setSessions((list) => {
+        const seen = new Set((list ?? []).map((s) => s.id))
+        return [...(list ?? []), ...page.sessions.filter((s) => !seen.has(s.id))]
+      })
+      setHasMore(page.has_more)
+    } catch {
+      // Leave the list untouched; the button stays for a retry.
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   const end = async (s: SessionRecord) => {
     setEndingId(s.id)
@@ -172,6 +199,14 @@ export default function SessionList() {
           />
         )}
       </Card>
+
+      {hasMore && !loading && !error && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => void loadMore()}>
+            {loadingMore ? 'Loading…' : 'Load more'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

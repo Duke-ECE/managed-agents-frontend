@@ -137,6 +137,26 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await throwIfNotOk(res)
 }
 
+/** PATCH /api/sessions/:id/title — user rename. 204 on success. */
+export async function renameSession(sessionId: string, title: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/title`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify({ title }),
+  })
+  await throwIfNotOk(res)
+}
+
+/** DELETE /api/sessions/:id?purge=true — hard-deletes the session and its
+ * transcript. Irreversible; pair with a danger ConfirmDialog. */
+export async function purgeSession(sessionId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}?purge=true`, {
+    method: 'DELETE',
+    headers: await authHeaders(),
+  })
+  await throwIfNotOk(res)
+}
+
 /** GET /api/me — account info and capability flags for the signed-in user. */
 export interface MeInfo {
   user_id: string
@@ -293,22 +313,63 @@ export async function deleteAgent(id: string): Promise<void> {
   await throwIfNotOk(res)
 }
 
-export async function listSessions(): Promise<SessionRecord[]> {
-  const res = await fetch(`${API_BASE}/api/sessions`, {
-    headers: await authHeaders(),
-  })
-  await throwIfNotOk(res)
-  const data = (await res.json()) as { sessions?: SessionRecord[] }
-  return data.sessions ?? []
+export interface SessionPage {
+  sessions: SessionRecord[]
+  has_more: boolean
 }
 
-export async function getTranscript(sessionId: string): Promise<TranscriptMessage[]> {
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages`, {
+export async function listSessions(opts?: { limit?: number; offset?: number }): Promise<SessionPage> {
+  const params = new URLSearchParams()
+  if (opts?.limit != null) params.set('limit', String(opts.limit))
+  if (opts?.offset != null) params.set('offset', String(opts.offset))
+  const qs = params.toString()
+  const res = await fetch(`${API_BASE}/api/sessions${qs ? `?${qs}` : ''}`, {
     headers: await authHeaders(),
   })
   await throwIfNotOk(res)
-  const data = (await res.json()) as { messages?: TranscriptMessage[] }
-  return data.messages ?? []
+  const data = (await res.json()) as { sessions?: SessionRecord[]; has_more?: boolean }
+  return { sessions: data.sessions ?? [], has_more: data.has_more ?? false }
+}
+
+export interface TranscriptPage {
+  messages: TranscriptMessage[] // ascending by seq
+  has_more: boolean // older messages exist beyond the returned window
+}
+
+/** GET /api/sessions/:id/messages — the latest `limit` turns by default;
+ * pass beforeSeq (the smallest seq currently loaded) to page backwards. */
+export async function getTranscript(
+  sessionId: string,
+  opts?: { limit?: number; beforeSeq?: number },
+): Promise<TranscriptPage> {
+  const params = new URLSearchParams()
+  if (opts?.limit != null) params.set('limit', String(opts.limit))
+  if (opts?.beforeSeq != null) params.set('before_seq', String(opts.beforeSeq))
+  const qs = params.toString()
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages${qs ? `?${qs}` : ''}`, {
+    headers: await authHeaders(),
+  })
+  await throwIfNotOk(res)
+  const data = (await res.json()) as { messages?: TranscriptMessage[]; has_more?: boolean }
+  return { messages: data.messages ?? [], has_more: data.has_more ?? false }
+}
+
+/** Leniently extract token usage from an assistant turn's content_json
+ * ({"content": "...", "usage": {"input_tokens": n, "output_tokens": n}}).
+ * The usage key is optional; anything malformed yields null. */
+export function turnUsage(contentJson: string): DonePayload | null {
+  try {
+    const parsed = JSON.parse(contentJson) as { usage?: unknown }
+    const usage = parsed?.usage
+    if (!usage || typeof usage !== 'object') return null
+    const u = usage as { input_tokens?: unknown; output_tokens?: unknown }
+    const input = typeof u.input_tokens === 'number' ? u.input_tokens : undefined
+    const output = typeof u.output_tokens === 'number' ? u.output_tokens : undefined
+    if (input == null && output == null) return null
+    return { input_tokens: input, output_tokens: output }
+  } catch {
+    return null
+  }
 }
 
 // Parse a single SSE frame ("event: x\ndata: {...}") into { event, data }.

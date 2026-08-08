@@ -5,6 +5,7 @@
  * no-op, and the UI renders a config error state instead.
  */
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js'
+import { clearTranscriptStorage } from '../pages/chat/transcript-cache'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -56,6 +57,9 @@ export async function signInWithPassword(email: string, password: string): Promi
 
 export async function signOut(): Promise<void> {
   if (!supabase) return
+  // Drop persisted transcript cache so the next account on this browser
+  // never sees the previous user's conversations.
+  clearTranscriptStorage()
   await supabase.auth.signOut()
 }
 
@@ -66,6 +70,7 @@ export async function signOut(): Promise<void> {
  */
 export async function handleUnauthorized(): Promise<void> {
   if (!supabase) return
+  clearTranscriptStorage()
   await supabase.auth.signOut({ scope: 'local' })
 }
 

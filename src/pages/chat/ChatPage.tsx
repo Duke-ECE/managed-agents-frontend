@@ -9,7 +9,7 @@ import { Card, PageHeader } from '../../components/Primitives'
 import { cn } from '../../utils/format'
 import ChatSidebar from './ChatSidebar'
 import Markdown from './Markdown'
-import { SwrCache } from './transcript-cache'
+import { SwrCache, TRANSCRIPT_STORAGE_PREFIX } from './transcript-cache'
 import {
   ApiError,
   createSession,
@@ -19,7 +19,10 @@ import {
   isPlatform,
   listAgents,
   listSessions,
+  purgeSession,
+  renameSession,
   streamSessionMessage,
+  turnUsage,
   PLATFORM_AGENT_ID,
   type AgentTemplate,
   type DonePayload,
@@ -33,6 +36,8 @@ import {
 } from '../../lib/chat-api'
 
 const SETTINGS_KEY = 'managed-agents.settings'
+const SESSIONS_PAGE_SIZE = 50
+const HISTORY_PAGE_SIZE = 50
 
 interface LlmSettings {
   mode: 'default' | 'custom'
@@ -68,12 +73,17 @@ interface ToolEventItem {
 
 interface ChatMessage {
   id: number
+  /** durable transcript seq; undefined for live, not-yet-saved turns */
+  seq?: number
   role: 'user' | 'assistant' | 'system'
   text: string
   tools: ToolEventItem[]
   done: boolean
   error: string | null
   usage: DonePayload | null
+  /** the stream broke (error/abort) mid-turn — this text was never written
+   * to the durable transcript */
+  partial: boolean
 }
 
 function isAbortError(err: unknown): boolean {
@@ -110,24 +120,28 @@ function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number):
     if (turn.role === 'system') {
       msgs.push({
         id: nextId(),
+        seq: turn.seq,
         role: 'system',
         text: turnText(turn.content_json),
         tools: [],
         done: true,
         error: null,
         usage: null,
+        partial: false,
       })
       continue
     }
     if (turn.role !== 'user' && turn.role !== 'assistant') continue
     msgs.push({
       id: nextId(),
+      seq: turn.seq,
       role: turn.role,
       text: turnText(turn.content_json),
       tools: turn.role === 'assistant' ? pendingTools : [],
       done: true,
       error: null,
-      usage: null,
+      usage: turn.role === 'assistant' ? turnUsage(turn.content_json) : null,
+      partial: false,
     })
     if (turn.role === 'assistant') pendingTools = []
   }
@@ -324,6 +338,9 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
             tokens: ↑ {msg.usage.input_tokens ?? '—'} · ↓ {msg.usage.output_tokens ?? '—'}
           </div>
         )}
+        {msg.done && msg.partial && (
+          <div className="mt-2 font-mono text-[10px] text-warn">partial — not saved</div>
+        )}
       </div>
     </div>
   )
@@ -354,9 +371,13 @@ export default function ChatPage() {
 
   const [sessions, setSessions] = useState<SessionRecord[] | null>(null)
   const [sessionsError, setSessionsError] = useState<string | null>(null)
+  const [sessionsHasMore, setSessionsHasMore] = useState(false)
+  const [sessionsLoadingMore, setSessionsLoadingMore] = useState(false)
   const [titles, setTitles] = useState<Record<string, string>>({})
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [hasMoreHistory, setHasMoreHistory] = useState(false)
+  const [loadingEarlier, setLoadingEarlier] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [sessionEnded, setSessionEnded] = useState(false)
   const [sessionMissing, setSessionMissing] = useState(false)
@@ -368,13 +389,24 @@ export default function ChatPage() {
   // Session created by the first message of a fresh /chat — the route change
   // it triggers must not wipe the live stream by reloading the transcript.
   const createdIdRef = useRef<string | null>(null)
-  // Component-lifetime SWR transcript cache: revisits render instantly from
-  // cache while the network copy revalidates in the background.
-  const cacheRef = useRef(new SwrCache<ChatMessage[]>())
+  // Component-lifetime SWR transcript cache (sessionStorage-backed): revisits
+  // render instantly from cache while the network copy revalidates.
+  const cacheRef = useRef(new SwrCache<ChatMessage[]>(TRANSCRIPT_STORAGE_PREFIX))
   // Latest messages for the transcript effect's cleanup (cache on leave).
   const messagesRef = useRef<ChatMessage[]>([])
   // Set when the server answers 410/404/403 — never cache such a session.
   const sessionGoneRef = useRef(false)
+  // Transcript pagination for the open session: every seq already loaded
+  // (including tool turns folded into bubbles) and the smallest one, which
+  // becomes before_seq when paging backwards.
+  const loadedSeqsRef = useRef<Set<number>>(new Set())
+  const oldestSeqRef = useRef<number | null>(null)
+  // Per-session "older messages exist" — survives cache-hit revisits where
+  // the revalidating fetch is discarded because local state moved ahead.
+  const historyHasMoreRef = useRef<Record<string, boolean>>({})
+  // Set while prepending earlier history so the scroll effect doesn't yank
+  // the view to the bottom.
+  const skipScrollRef = useRef(false)
 
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
@@ -385,17 +417,42 @@ export default function ChatPage() {
   }, [messages])
 
   useEffect(() => {
+    if (skipScrollRef.current) {
+      skipScrollRef.current = false
+      return
+    }
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages])
 
-  // Sidebar session list.
+  // Sidebar session list — first page only; "Load more" appends the rest.
   useEffect(() => {
     let cancelled = false
-    listSessions()
-      .then((list) => { if (!cancelled) setSessions(list) })
+    listSessions({ limit: SESSIONS_PAGE_SIZE })
+      .then((page) => {
+        if (cancelled) return
+        setSessions(page.sessions)
+        setSessionsHasMore(page.has_more)
+      })
       .catch((err) => { if (!cancelled) setSessionsError(err instanceof Error ? err.message : String(err)) })
     return () => { cancelled = true }
   }, [])
+
+  // Append the next page of sessions (deduped by id — a session created or
+  // ended locally may already be in the list).
+  const loadMoreSessions = useCallback(() => {
+    if (sessionsLoadingMore) return
+    setSessionsLoadingMore(true)
+    listSessions({ limit: SESSIONS_PAGE_SIZE, offset: sessions?.length ?? 0 })
+      .then((page) => {
+        setSessions((list) => {
+          const seen = new Set((list ?? []).map((s) => s.id))
+          return [...(list ?? []), ...page.sessions.filter((s) => !seen.has(s.id))]
+        })
+        setSessionsHasMore(page.has_more)
+      })
+      .catch(() => {}) // transient; the button stays for a retry
+      .finally(() => setSessionsLoadingMore(false))
+  }, [sessions?.length, sessionsLoadingMore])
 
   // Capability flags — best effort; a network failure must not block custom-key chatting.
   useEffect(() => {
@@ -463,28 +520,40 @@ export default function ChatPage() {
     setSessionMissing(false)
     setHistoryError(null)
     sessionGoneRef.current = false
+    loadedSeqsRef.current = new Set()
+    oldestSeqRef.current = null
     if (!routeId) {
       setMessages([])
+      setHasMoreHistory(false)
       return
     }
     const cache = cacheRef.current
     const hasCached = cache.has(routeId)
     const displayed = cache.get(routeId) ?? []
     setMessages(displayed)
+    // A cached view may include earlier pages loaded on a previous visit;
+    // restore the remembered pagination flag until the fetch decides.
+    setHasMoreHistory(historyHasMoreRef.current[routeId] ?? false)
     let cancelled = false
     if (!hasCached) setHistoryLoading(true)
     // Always revalidate — in the background when a cached view is on screen.
-    getTranscript(routeId)
-      .then((turns) => {
+    // Fetches the LATEST window; older pages load via the button up top.
+    getTranscript(routeId, { limit: HISTORY_PAGE_SIZE })
+      .then((page) => {
         if (cancelled) return
         // The user may have started a new turn while this fetch was in
         // flight (the composer is enabled on a cache hit). If local state
         // moved past what we displayed, it is ahead of the server copy —
         // keep it; the leave-cleanup will cache the local view instead.
         if (messagesRef.current !== displayed) return
+        const turns = page.messages
         const fresh = transcriptToMessages(turns, () => nextMsgId.current++)
         setMessages(fresh)
         cache.set(routeId, fresh)
+        loadedSeqsRef.current = new Set(turns.map((t) => t.seq))
+        oldestSeqRef.current = turns.length > 0 ? turns[0].seq : null
+        historyHasMoreRef.current[routeId] = page.has_more
+        setHasMoreHistory(page.has_more)
         const firstUser = turns.find((t) => t.role === 'user')
         if (firstUser) {
           const title = turnText(firstUser.content_json).trim().slice(0, 40)
@@ -546,6 +615,7 @@ export default function ChatPage() {
     (sid: string) => {
       deleteSession(sid).catch(() => {}) // best effort
       cacheRef.current.delete(sid)
+      delete historyHasMoreRef.current[sid]
       // Ending the open session navigates away — don't re-cache it on leave.
       if (sid === routeId) sessionGoneRef.current = true
       setSessions((list) => list?.filter((s) => s.id !== sid) ?? list)
@@ -566,10 +636,65 @@ export default function ChatPage() {
   const prefetchSession = useCallback((sid: string) => {
     const cache = cacheRef.current
     if (cache.has(sid)) return
-    getTranscript(sid)
-      .then((turns) => cache.set(sid, transcriptToMessages(turns, () => nextMsgId.current++)))
+    getTranscript(sid, { limit: HISTORY_PAGE_SIZE })
+      .then((page) => cache.set(sid, transcriptToMessages(page.messages, () => nextMsgId.current++)))
       .catch(() => {})
   }, [])
+
+  // Prepend the previous window of transcript turns. Deduped by seq (a page
+  // boundary can re-deliver a folded tool turn), then cached so a revisit
+  // keeps the assembled history.
+  const loadEarlier = useCallback(() => {
+    if (!routeId || loadingEarlier || !hasMoreHistory) return
+    const beforeSeq = oldestSeqRef.current
+    if (beforeSeq == null) return
+    setLoadingEarlier(true)
+    getTranscript(routeId, { limit: HISTORY_PAGE_SIZE, beforeSeq })
+      .then((page) => {
+        const older = page.messages.filter((t) => !loadedSeqsRef.current.has(t.seq))
+        for (const t of page.messages) loadedSeqsRef.current.add(t.seq)
+        if (older.length > 0) {
+          oldestSeqRef.current = older[0].seq // turns arrive ascending by seq
+          const olderMsgs = transcriptToMessages(older, () => nextMsgId.current++)
+          const merged = [...olderMsgs, ...messagesRef.current]
+          skipScrollRef.current = true // prepending must not scroll to bottom
+          setMessages(merged)
+          cacheRef.current.set(routeId, merged)
+        }
+        historyHasMoreRef.current[routeId] = page.has_more
+        setHasMoreHistory(page.has_more)
+      })
+      .catch(() => {}) // transient; the button stays for a retry
+      .finally(() => setLoadingEarlier(false))
+  }, [routeId, loadingEarlier, hasMoreHistory])
+
+  // User rename — empty titles never reach here (the sidebar no-ops them).
+  const renameChat = useCallback((sid: string, title: string) => {
+    renameSession(sid, title)
+      .then(() => {
+        setSessions((list) => list?.map((s) => (s.id === sid ? { ...s, title } : s)) ?? list)
+      })
+      .catch(() => {}) // the old title stays; the next list refresh settles it
+  }, [])
+
+  // Hard delete (purge): session + transcript are gone server-side, so drop
+  // every local trace too (SWR cache, sessionStorage entry, sidebar, title).
+  const purgeChat = useCallback(
+    (sid: string) => {
+      purgeSession(sid).catch(() => {}) // best effort
+      cacheRef.current.delete(sid)
+      delete historyHasMoreRef.current[sid]
+      if (sid === routeId) sessionGoneRef.current = true
+      setSessions((list) => list?.filter((s) => s.id !== sid) ?? list)
+      setTitles((t) => {
+        const next = { ...t }
+        delete next[sid]
+        return next
+      })
+      if (sid === routeId) navigate('/chat')
+    },
+    [navigate, routeId],
+  )
 
   const saveSettings = useCallback(
     (next: LlmSettings) => {
@@ -589,11 +714,11 @@ export default function ChatPage() {
 
       const userMsg: ChatMessage = {
         id: nextMsgId.current++, role: 'user', text,
-        tools: [], done: true, error: null, usage: null,
+        tools: [], done: true, error: null, usage: null, partial: false,
       }
       const assistantMsg: ChatMessage = {
         id: nextMsgId.current++, role: 'assistant', text: '',
-        tools: [], done: false, error: null, usage: null,
+        tools: [], done: false, error: null, usage: null, partial: false,
       }
       setMessages((msgs) => [...msgs, userMsg, assistantMsg])
       setStreaming(true)
@@ -661,7 +786,14 @@ export default function ChatPage() {
                   typeof data === 'string'
                     ? data
                     : ((data as ErrorPayload)?.message ?? JSON.stringify(data))
-                patch((m) => ({ ...m, error: message, done: true }))
+                // A backend error event ends the turn without a done frame —
+                // partial text on screen was never written to the transcript.
+                patch((m) => ({
+                  ...m,
+                  error: message,
+                  done: true,
+                  partial: m.text.length > 0 || m.tools.length > 0,
+                }))
                 break
               }
               case 'done':
@@ -672,18 +804,33 @@ export default function ChatPage() {
             }
           },
         })
-        patch((m) => (m.done ? m : { ...m, done: true }))
+        // The stream ended without a done frame (connection dropped cleanly
+        // mid-turn) — whatever text streamed is not in the transcript.
+        patch((m) =>
+          m.done ? m : { ...m, done: true, partial: m.text.length > 0 || m.tools.length > 0 },
+        )
       } catch (err) {
         if (isAbortError(err)) {
-          patch((m) => ({ ...m, done: true }))
+          // Stop button (or navigation): keep the partial text, flag it.
+          patch((m) => ({ ...m, done: true, partial: m.text.length > 0 || m.tools.length > 0 }))
           return
         }
         if (err instanceof ApiError && err.status === 410) {
           setSessionEnded(true)
-          patch((m) => ({ ...m, done: true, error: m.error ?? 'This session has ended on the server.' }))
+          patch((m) => ({
+            ...m,
+            done: true,
+            error: m.error ?? 'This session has ended on the server.',
+            partial: m.text.length > 0 || m.tools.length > 0,
+          }))
         } else {
           const message = err instanceof Error ? err.message : String(err)
-          patch((m) => ({ ...m, done: true, error: m.error ?? message }))
+          patch((m) => ({
+            ...m,
+            done: true,
+            error: m.error ?? message,
+            partial: m.text.length > 0 || m.tools.length > 0,
+          }))
         }
       } finally {
         setStreaming(false)
@@ -719,9 +866,14 @@ export default function ChatPage() {
         error={sessionsError}
         activeId={routeId}
         titles={titles}
+        hasMore={sessionsHasMore}
+        loadingMore={sessionsLoadingMore}
         onNew={newChat}
         onSelect={(sid) => navigate(`/chat/${sid}`)}
         onEnd={endChat}
+        onRename={renameChat}
+        onDelete={purgeChat}
+        onLoadMore={loadMoreSessions}
         onPrefetchSession={prefetchSession}
       />
 
@@ -819,6 +971,19 @@ export default function ChatPage() {
         <Card className="flex min-h-0 flex-1 flex-col">
           {/* Messages */}
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+            {hasMoreHistory && !historyLoading && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  disabled={loadingEarlier}
+                  onClick={loadEarlier}
+                  className="flex h-7 items-center gap-1.5 rounded-full border border-ink-700 bg-ink-850 px-3 text-[11px] text-ink-400 transition-colors hover:text-ink-200 disabled:opacity-50"
+                >
+                  {loadingEarlier && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {loadingEarlier ? 'Loading…' : 'Load earlier messages'}
+                </button>
+              </div>
+            )}
             {historyLoading && (
               <div className="flex h-full items-center justify-center gap-2 text-[13px] text-ink-500">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading conversation…
