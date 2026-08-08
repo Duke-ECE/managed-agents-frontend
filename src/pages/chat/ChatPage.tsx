@@ -68,7 +68,7 @@ interface ToolEventItem {
 
 interface ChatMessage {
   id: number
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   text: string
   tools: ToolEventItem[]
   done: boolean
@@ -94,6 +94,8 @@ function turnText(contentJson: string): string {
 /**
  * Map a durable transcript to chat bubbles. tool_call/tool_result turns are
  * folded into the next assistant message, matching how live streams render.
+ * system turns (the session's system prompt, recorded by the runtime) become
+ * centered notices; they never absorb pending tool turns.
  */
 function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number): ChatMessage[] {
   const msgs: ChatMessage[] = []
@@ -103,6 +105,18 @@ function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number):
       let data: unknown = turn.content_json
       try { data = JSON.parse(turn.content_json) } catch { /* keep the raw string */ }
       pendingTools.push({ kind: turn.role, data })
+      continue
+    }
+    if (turn.role === 'system') {
+      msgs.push({
+        id: nextId(),
+        role: 'system',
+        text: turnText(turn.content_json),
+        tools: [],
+        done: true,
+        error: null,
+        usage: null,
+      })
       continue
     }
     if (turn.role !== 'user' && turn.role !== 'assistant') continue
@@ -254,6 +268,21 @@ function ToolLine({ item }: { item: ToolEventItem }) {
 }
 
 function MessageBubble({ msg }: { msg: ChatMessage }) {
+  if (msg.role === 'system') {
+    // System-prompt record: a centered muted notice, not a chat bubble. Long
+    // prompts truncate to one line; the full text is in the tooltip.
+    return (
+      <div className="flex justify-center">
+        <p
+          className="max-w-[85%] truncate rounded-full border border-ink-700 bg-ink-850 px-3 py-1 text-[11px] text-ink-500"
+          title={msg.text}
+        >
+          System prompt: {msg.text}
+        </p>
+      </div>
+    )
+  }
+
   if (msg.role === 'user') {
     return (
       <div className="flex justify-end gap-3">
