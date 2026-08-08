@@ -105,7 +105,9 @@ function turnText(contentJson: string): string {
  * Map a durable transcript to chat bubbles. tool_call/tool_result turns are
  * folded into the next assistant message, matching how live streams render.
  * system turns (the session's system prompt, recorded by the runtime) become
- * centered notices; they never absorb pending tool turns.
+ * centered notices; they never absorb pending tool turns. config turns
+ * (session metadata: the redacted LLM base_url/model triple) are not chat
+ * content and are skipped like any other non-chat role.
  */
 function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number): ChatMessage[] {
   const msgs: ChatMessage[] = []
@@ -131,6 +133,9 @@ function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number):
       })
       continue
     }
+    // config turns are session metadata (the redacted LLM base_url/model
+    // triple), not chat content — skip them like any other non-chat role.
+    if (turn.role === 'config') continue
     if (turn.role !== 'user' && turn.role !== 'assistant') continue
     msgs.push({
       id: nextId(),

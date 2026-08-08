@@ -42,7 +42,7 @@ export interface SessionRecord {
 
 export interface TranscriptMessage {
   seq: number
-  role: string // "user" | "assistant" | "tool_call" | "tool_result" | "system"
+  role: string // "user" | "assistant" | "tool_call" | "tool_result" | "system" | "config" (session metadata, not chat content)
   content_json: string // role-specific payload, JSON-encoded
   created_at: string
 }
