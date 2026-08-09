@@ -57,7 +57,7 @@ function draftFrom(state: AgentDrawerState, platformBlocked: boolean): Draft {
       description: '',
       systemPrompt: '',
       // The platform default is whitelist-gated; users without access start
-      // on custom, same as the chat LLM settings.
+      // on custom.
       llmMode: platformBlocked ? 'custom' : 'platform_default',
       apiKey: '',
       baseUrl: DEFAULT_BASE_URL,

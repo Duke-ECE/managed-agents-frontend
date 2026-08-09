@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle, Bot, CircleCheck, CircleX, Loader2, MessageSquare,
-  SendHorizontal, Settings2, Square, User, Wrench,
+  SendHorizontal, Square, User, Wrench,
 } from 'lucide-react'
 import { Button } from '../../components/ConfirmDialog'
 import { Card, PageHeader } from '../../components/Primitives'
@@ -35,36 +35,8 @@ import {
   type TranscriptMessage,
 } from '../../lib/chat-api'
 
-const SETTINGS_KEY = 'managed-agents.settings'
 const SESSIONS_PAGE_SIZE = 50
 const HISTORY_PAGE_SIZE = 50
-
-interface LlmSettings {
-  mode: 'default' | 'custom'
-  apiKey: string
-  baseUrl: string
-  model: string
-}
-
-const DEFAULT_SETTINGS: LlmSettings = {
-  mode: 'default',
-  apiKey: '',
-  baseUrl: 'https://api.openai.com/v1',
-  model: 'gpt-4o-mini',
-}
-
-function loadSettings(): LlmSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY)
-    if (!raw) return DEFAULT_SETTINGS
-    const parsed = JSON.parse(raw) as Partial<LlmSettings>
-    // Settings saved before the mode toggle existed: a saved key means custom.
-    const mode = parsed.mode ?? (parsed.apiKey ? 'custom' : 'default')
-    return { ...DEFAULT_SETTINGS, ...parsed, mode }
-  } catch {
-    return DEFAULT_SETTINGS
-  }
-}
 
 interface ToolEventItem {
   kind: 'tool_call' | 'tool_result'
@@ -151,110 +123,6 @@ function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number):
     if (turn.role === 'assistant') pendingTools = []
   }
   return msgs
-}
-
-/* ------------------------------ Settings panel ------------------------------ */
-
-function SettingsPanel({
-  settings,
-  platformBlocked,
-  onSave,
-}: {
-  settings: LlmSettings
-  platformBlocked: boolean
-  onSave: (next: LlmSettings) => void
-}) {
-  const [draft, setDraft] = useState(settings)
-
-  const save = (e: FormEvent) => {
-    e.preventDefault()
-    onSave({
-      mode: draft.mode,
-      apiKey: draft.apiKey.trim(),
-      baseUrl: draft.baseUrl.trim() || DEFAULT_SETTINGS.baseUrl,
-      model: draft.model.trim() || DEFAULT_SETTINGS.model,
-    })
-  }
-
-  const inputCls =
-    'h-9 w-full rounded-lg border border-ink-700 bg-ink-850 px-3 text-[13px] text-ink-100 placeholder:text-ink-500 transition-colors focus:border-accent focus:outline-none'
-
-  return (
-    <Card className="mb-5 p-5 animate-fade-in">
-      <form onSubmit={save} className="space-y-4">
-        <div className="flex gap-2">
-          {(['default', 'custom'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              disabled={platformBlocked && m === 'default'}
-              onClick={() => setDraft((d) => ({ ...d, mode: m }))}
-              className={cn(
-                'h-8 rounded-lg border px-3 text-[12px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
-                draft.mode === m
-                  ? 'border-accent bg-accent/10 text-ink-100'
-                  : 'border-ink-700 bg-ink-850 text-ink-400 hover:text-ink-200',
-              )}
-            >
-              {m === 'default' ? 'Default provider' : 'Custom provider'}
-            </button>
-          ))}
-        </div>
-        {draft.mode === 'default' ? (
-          platformBlocked ? (
-            <p className="rounded-lg border border-warn-line bg-warn-soft px-3 py-2.5 text-[12px] text-warn">
-              Platform provider not enabled for your account — use a custom key or ask an admin.
-            </p>
-          ) : (
-          <p className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-2.5 text-[12px] text-ink-400">
-            OpenRouter · openai/gpt-oss-20b:free — provided by the platform, no API key needed.
-          </p>
-          )
-        ) : (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400">API key</span>
-            <input
-              type="password"
-              className={inputCls}
-              value={draft.apiKey}
-              onChange={(e) => setDraft((d) => ({ ...d, apiKey: e.target.value }))}
-              placeholder="sk-…"
-              autoComplete="off"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400">Base URL</span>
-            <input
-              type="text"
-              className={inputCls}
-              value={draft.baseUrl}
-              onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value }))}
-              placeholder={DEFAULT_SETTINGS.baseUrl}
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400">Model</span>
-            <input
-              type="text"
-              className={inputCls}
-              value={draft.model}
-              onChange={(e) => setDraft((d) => ({ ...d, model: e.target.value }))}
-              placeholder={DEFAULT_SETTINGS.model}
-            />
-          </label>
-        </div>
-        )}
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-[12px] text-ink-500">
-            Stored in your browser only; sent to the managed-agents backend when a session is created.
-            Saving ends the current chat session.
-          </p>
-          <Button type="submit" size="sm" className="shrink-0">Save settings</Button>
-        </div>
-      </form>
-    </Card>
-  )
 }
 
 /* ------------------------------ Message bubbles ------------------------------ */
@@ -357,13 +225,6 @@ export default function ChatPage() {
   const { id: routeId = null } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const [settings, setSettings] = useState<LlmSettings>(loadSettings)
-  // Auto-open settings only when configuration is actually needed:
-  // custom mode without a key. Default mode works out of the box.
-  const [settingsOpen, setSettingsOpen] = useState(() => {
-    const s = loadSettings()
-    return s.mode === 'custom' && !s.apiKey
-  })
   // /api/me capability flags. null = unknown (fetch failed or in flight) —
   // degrade gracefully and let the backend be the gate.
   const [me, setMe] = useState<MeInfo | null>(null)
@@ -371,7 +232,8 @@ export default function ChatPage() {
   // Agent templates for the new-chat picker and the in-chat name badge.
   // null = load in flight/failed — never block the chat on this.
   const [agents, setAgents] = useState<AgentTemplate[] | null>(null)
-  // '' = "No agent" (ad-hoc LLM settings apply to a fresh chat).
+  // '' = nothing selected yet — every chat session runs an agent template, so
+  // a fresh chat can't send until one is picked (see the default-pick below).
   const [selectedAgentId, setSelectedAgentId] = useState('')
 
   const [sessions, setSessions] = useState<SessionRecord[] | null>(null)
@@ -412,10 +274,6 @@ export default function ChatPage() {
   // Set while prepending earlier history so the scroll effect doesn't yank
   // the view to the bottom.
   const skipScrollRef = useRef(false)
-
-  useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
-  }, [settings])
 
   useEffect(() => {
     messagesRef.current = messages
@@ -481,17 +339,20 @@ export default function ChatPage() {
   // The platform default provider is gated on whitelist membership.
   const platformBlocked = me !== null && !me.can_use_platform_llm
 
-  // Default-select the built-in template on a fresh /chat — but only for
-  // users who may use the platform LLM (the built-in is platform_default, so
-  // anyone else would 403 on send; they keep "No agent"). Once only, so a
-  // later manual choice is never overridden.
+  // Default-select an agent template on a fresh /chat, once agents and
+  // /api/me have both loaded. Members get the built-in Default assistant
+  // (falling back to the first platform template); anyone else gets the first
+  // selectable private template (platform_default ones would 403 on send).
+  // Once only, so a later manual choice is never overridden. A failed /api/me
+  // leaves the picker unselected rather than guessing at capabilities.
   const defaultAgentPickedRef = useRef(false)
   useEffect(() => {
-    if (routeId || defaultAgentPickedRef.current || !agents || !me?.can_use_platform_llm) return
+    if (routeId || defaultAgentPickedRef.current || !agents || !me) return
     defaultAgentPickedRef.current = true
-    const builtin =
-      agents.find((a) => a.id === PLATFORM_AGENT_ID) ?? agents.find((a) => isPlatform(a))
-    if (builtin) setSelectedAgentId(builtin.id)
+    const pick = me.can_use_platform_llm
+      ? agents.find((a) => a.id === PLATFORM_AGENT_ID) ?? agents.find((a) => isPlatform(a))
+      : agents.find((a) => !isPlatform(a) && a.llm_mode !== 'platform_default')
+    if (pick) setSelectedAgentId(pick.id)
   }, [routeId, agents, me])
 
   // Resolve the open session's template to a name. A deleted template (or
@@ -503,11 +364,14 @@ export default function ChatPage() {
     ? agents?.find((a) => a.id === sessionAgentId)?.name
     : undefined
 
-  // Surface the settings panel when the saved default mode can't be used
-  // (an agent template brings its own LLM, so it doesn't apply then).
-  useEffect(() => {
-    if (platformBlocked && settings.mode === 'default' && !selectedAgentId) setSettingsOpen(true)
-  }, [platformBlocked, settings.mode, selectedAgentId])
+  // A fresh chat needs a selectable template: platform_default options are
+  // gated on platform-LLM access (they would 403 on send). The list loaded
+  // but nothing in it can be picked — mainly a non-member with no private
+  // templates, since members always have the built-ins.
+  const hasSelectableAgent =
+    agents !== null &&
+    agents.some((a) => !(platformBlocked && a.llm_mode === 'platform_default'))
+  const noUsableAgent = !routeId && agents !== null && !hasSelectableAgent
 
   // Load the transcript whenever the URL picks a session. SWR: a cached
   // transcript renders instantly while the network copy revalidates in the
@@ -701,21 +565,12 @@ export default function ChatPage() {
     [navigate, routeId],
   )
 
-  const saveSettings = useCallback(
-    (next: LlmSettings) => {
-      setSettings(next)
-      setSettingsOpen(false)
-      // LLM credentials are bound to the session, so the current chat ends.
-      if (routeId) endChat(routeId)
-      else navigate('/chat')
-    },
-    [endChat, navigate, routeId],
-  )
-
   const send = useCallback(
     async (content: string) => {
       const text = content.trim()
       if (!text || streaming || historyLoading || sessionEnded || sessionMissing || historyError) return
+      // Every session runs an agent template — a fresh chat can't start without one.
+      if (!routeId && !selectedAgentId) return
 
       const userMsg: ChatMessage = {
         id: nextMsgId.current++, role: 'user', text,
@@ -734,26 +589,15 @@ export default function ChatPage() {
         let sid = routeId
         if (!sid) {
           // First message of a fresh chat: create the session, then adopt its
-          // id in the URL so refresh restores the conversation. With an agent
-          // template selected it governs the LLM/prompt/tools — the local LLM
-          // settings are not sent at all.
-          const newId = selectedAgentId
-            ? await createSession({ agentId: selectedAgentId })
-            : settings.mode === 'custom' && settings.apiKey
-              ? await createSession({
-                  llm: {
-                    api_key: settings.apiKey,
-                    base_url: settings.baseUrl,
-                    model: settings.model,
-                  },
-                })
-              : await createSession()
+          // id in the URL so refresh restores the conversation. The selected
+          // agent template governs the session's LLM/prompt/tools.
+          const newId = await createSession({ agentId: selectedAgentId })
           sid = newId
           createdIdRef.current = newId
           const now = new Date().toISOString()
           const record: SessionRecord = {
             id: newId, user_id: '', status: 'active',
-            agent_id: selectedAgentId || undefined,
+            agent_id: selectedAgentId,
             created_at: now, last_active: now,
           }
           setSessions((list) => [record, ...(list ?? [])])
@@ -842,27 +686,22 @@ export default function ChatPage() {
         abortRef.current = null
       }
     },
-    [routeId, settings, selectedAgentId, streaming, historyLoading, sessionEnded, sessionMissing, historyError, navigate],
+    [routeId, selectedAgentId, streaming, historyLoading, sessionEnded, sessionMissing, historyError, navigate],
   )
 
-  // An agent template brings its own LLM (key stored server-side), so a fresh
-  // chat with one selected doesn't depend on the local LLM settings.
-  const agentSelected = !routeId && selectedAgentId !== ''
-  const ready = agentSelected
-    ? true
-    : settings.mode === 'default'
-      ? !platformBlocked
-      : Boolean(settings.apiKey)
+  // A fresh chat can send once an agent template is selected; an open session
+  // keeps its template from creation, so it's always sendable.
+  const ready = routeId !== null || selectedAgentId !== ''
   const blocked = sessionEnded || sessionMissing || historyError !== null || historyLoading
   const placeholder = sessionEnded
     ? 'This session has ended — start a new chat'
     : sessionMissing
       ? 'This chat is unavailable'
-      : ready
-        ? 'Message… (Enter to send, Shift+Enter for newline)'
-        : platformBlocked && settings.mode === 'default'
-          ? 'Platform provider not enabled — set a custom key in LLM settings'
-          : 'Configure your LLM settings first'
+      : noUsableAgent
+        ? 'No usable agent — create one with your own API key on the Agents page'
+        : ready
+          ? 'Message… (Enter to send, Shift+Enter for newline)'
+          : 'Select an agent above to start chatting'
 
   return (
     <div className="flex h-full gap-6">
@@ -897,7 +736,7 @@ export default function ChatPage() {
                   title="Agent template for the new chat"
                   className="h-8 rounded-lg border border-ink-700 bg-ink-850 px-2 text-[12px] text-ink-100 transition-colors focus:border-accent focus:outline-none"
                 >
-                  <option value="">No agent</option>
+                  <option value="" disabled>Select an agent…</option>
                   {agents.map((a) => {
                     // platform_default templates need platform-LLM access;
                     // without it they would 403 on send — disable them.
@@ -914,22 +753,29 @@ export default function ChatPage() {
                   })}
                 </select>
               )}
+              {noUsableAgent && (
+                <p className="flex items-center gap-1.5 rounded-lg border border-warn-line bg-warn-soft px-3 py-1.5 text-[12px] text-warn">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    No usable agent —{' '}
+                    <Link
+                      to="/agents"
+                      className="font-semibold underline underline-offset-2 transition-colors hover:text-ink-100"
+                    >
+                      create one with your own API key on the Agents page
+                    </Link>
+                  </span>
+                </p>
+              )}
               {activeAgentName && (
                 <span className="flex items-center gap-1.5 rounded-full border border-vio-line bg-vio-soft px-2.5 py-1 text-[11px] font-medium text-vio">
                   <Bot className="h-3 w-3" />
                   {activeAgentName}
                 </span>
               )}
-              <Button variant="outline" size="sm" onClick={() => setSettingsOpen((o) => !o)}>
-                <Settings2 className="h-3.5 w-3.5" />
-                LLM settings
-                {!ready && <span className="rounded border border-warn-line bg-warn-soft px-1 font-mono text-[9px] uppercase text-warn">required</span>}
-              </Button>
             </>
           }
         />
-
-        {settingsOpen && <SettingsPanel key={settings.apiKey + settings.baseUrl + settings.model} settings={settings} platformBlocked={platformBlocked} onSave={saveSettings} />}
 
         {sessionEnded && (
           <div className="mb-4 flex items-center gap-3 rounded-xl border border-warn-line bg-warn-soft px-4 py-3 text-[13px] text-warn animate-fade-in">
@@ -1003,7 +849,9 @@ export default function ChatPage() {
                 <p className="mt-1 max-w-sm text-[13px] text-ink-400">
                   {ready
                     ? 'Send a message to start a session — one is created lazily on your first message.'
-                    : 'Set your LLM API key in LLM settings above to start chatting.'}
+                    : noUsableAgent
+                      ? 'Create an agent with your own API key on the Agents page to start chatting.'
+                      : 'Select an agent above to start chatting.'}
                 </p>
               </div>
             )}
