@@ -78,9 +78,43 @@ export interface ErrorPayload {
   retryable?: boolean
 }
 
+/**
+ * The `done` frame's payload. The v1 contract carries flat token counts; the
+ * durable (v2) contract carries per-model-call totals under `aggregate_usage`
+ * plus the request identity and terminal status. Both are accepted so the
+ * console works before and after the cutover flips the backend's chat path.
+ */
 export interface DonePayload {
   input_tokens?: number
   output_tokens?: number
+  request_message_id?: string
+  status?: string
+  revision?: number
+  aggregate_usage?: {
+    input_tokens?: number
+    output_tokens?: number
+    total_tokens?: number
+  }
+}
+
+/**
+ * Total token usage from a done frame, whichever contract produced it, or null
+ * when the provider reported none. A v2 stream aggregates per model call, so a
+ * tool-loop turn still shows one total.
+ */
+export function doneUsage(payload: DonePayload | null | undefined): { input_tokens: number; output_tokens: number } | null {
+  if (!payload) return null
+  const input = numberOr(payload.aggregate_usage?.input_tokens) ?? numberOr(payload.input_tokens)
+  const output = numberOr(payload.aggregate_usage?.output_tokens) ?? numberOr(payload.output_tokens)
+  if (input === undefined && output === undefined) return null
+  return { input_tokens: input ?? 0, output_tokens: output ?? 0 }
+}
+
+function numberOr(value: unknown): number | undefined {
+  // protojson renders int64 as a string, so accept both.
+  if (typeof value === 'number') return value
+  if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) return Number(value)
+  return undefined
 }
 
 async function authHeaders(): Promise<Record<string, string>> {

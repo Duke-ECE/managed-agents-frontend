@@ -26,6 +26,7 @@ import {
   turnUsage,
   PLATFORM_AGENT_ID,
   type AgentTemplate,
+  doneUsage,
   type DonePayload,
   type ErrorPayload,
   type MeInfo,
@@ -53,7 +54,7 @@ interface ChatMessage {
   tools: ToolEventItem[]
   done: boolean
   error: string | null
-  usage: DonePayload | null
+  usage: { input_tokens?: number; output_tokens?: number } | null
   /** the stream broke (error/abort) mid-turn — this text was never written
    * to the durable transcript */
   partial: boolean
@@ -653,7 +654,9 @@ export default function ChatPage() {
                 break
               }
               case 'done':
-                patch((m) => ({ ...m, done: true, usage: (data as DonePayload) ?? null }))
+                // Normalize here so the renderer only ever sees flat counts,
+                // whether the backend streamed the v1 frame or the durable one.
+                patch((m) => ({ ...m, done: true, usage: doneUsage(data as DonePayload) }))
                 break
               default:
                 break
