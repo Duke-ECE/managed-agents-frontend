@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Copy } from 'lucide-react'
 import {
   createAgent,
-  updateAgent,
   AGENT_TOOLS,
   type AgentInput,
   type AgentTemplate,
@@ -36,17 +35,17 @@ interface Draft {
  * What the drawer shows. `view` is the read-only look at a platform
  * (built-in) template; `clone` is a create pre-filled from a template — it
  * never sends an id or visibility, so the result is a normal private
- * template.
+ * template. There is deliberately no edit state: templates are immutable after
+ * creation (decision D001), so a changed configuration is always a new one.
  */
 export type AgentDrawerState =
   | { kind: 'create' }
-  | { kind: 'edit'; agent: AgentTemplate }
   | { kind: 'view'; agent: AgentTemplate }
   | { kind: 'clone'; source: AgentTemplate }
 
 function draftFrom(state: AgentDrawerState, platformBlocked: boolean): Draft {
   const source =
-    state.kind === 'edit' || state.kind === 'view'
+    state.kind === 'view'
       ? state.agent
       : state.kind === 'clone'
         ? state.source
@@ -120,8 +119,6 @@ export default function AgentFormDrawer({
     }))
 
   const readOnly = state.kind === 'view'
-  // Only an existing private template is PATCHed; create and clone both POST.
-  const editAgent = state.kind === 'edit' ? state.agent : null
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -140,14 +137,12 @@ export default function AgentFormDrawer({
         tools: AGENT_TOOLS.every((t) => draft.tools.includes(t)) ? [] : draft.tools,
       }
       if (draft.llmMode === 'platform_default') {
-        // Clear any stored key (only valid together with platform_default).
+        // No stored key for a platform-default template.
         input.llm_api_key = ''
-      } else if (!editAgent || draft.apiKey) {
-        // Create/clone always sends the key; on edit an empty field keeps it.
+      } else {
         input.llm_api_key = draft.apiKey
       }
-      if (editAgent) await updateAgent(editAgent.id, input)
-      else await createAgent(input)
+      await createAgent(input)
       onSaved()
       onClose()
     } catch (err) {
@@ -157,12 +152,10 @@ export default function AgentFormDrawer({
     }
   }
 
-  const keyRequired = draft.llmMode === 'custom' && !editAgent
+  const keyRequired = draft.llmMode === 'custom'
 
   const title =
-    state.kind === 'edit' ? (
-      `Edit ${state.agent.name}`
-    ) : state.kind === 'view' ? (
+    state.kind === 'view' ? (
       <span className="flex items-center gap-2">
         {state.agent.name}
         <StatusBadge status="platform" label="Built-in" />
@@ -193,11 +186,9 @@ export default function AgentFormDrawer({
             <Button onClick={() => formRef.current?.requestSubmit()} disabled={submitting}>
               {submitting
                 ? 'Saving…'
-                : state.kind === 'edit'
-                  ? 'Save changes'
-                  : state.kind === 'clone'
-                    ? 'Create clone'
-                    : 'Create agent'}
+                : state.kind === 'clone'
+                  ? 'Create clone'
+                  : 'Create agent'}
             </Button>
           </div>
         )
@@ -287,7 +278,7 @@ export default function AgentFormDrawer({
                   className={inputCls}
                   value={draft.apiKey}
                   onChange={(e) => setDraft((d) => ({ ...d, apiKey: e.target.value }))}
-                  placeholder={editAgent ? 'leave empty to keep current key' : 'sk-…'}
+                  placeholder="sk-…"
                   autoComplete="off"
                 />
               </div>

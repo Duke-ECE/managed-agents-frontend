@@ -305,16 +305,6 @@ export async function createAgent(input: AgentInput): Promise<AgentTemplate> {
   return (await res.json()) as AgentTemplate
 }
 
-export async function updateAgent(id: string, input: AgentInput): Promise<AgentTemplate> {
-  const res = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-    body: JSON.stringify(input),
-  })
-  await throwIfNotOk(res)
-  return (await res.json()) as AgentTemplate
-}
-
 /**
  * Retire a template by lifecycle metadata (decision D001). Content is
  * untouched: the template stays viewable and cloneable, and existing sessions

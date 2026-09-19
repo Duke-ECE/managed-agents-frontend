@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Archive, Bot, Copy, Eye, Pencil, Plus, ShieldX, Wrench } from 'lucide-react'
+import { Archive, Bot, Copy, Eye, Plus, ShieldX, Wrench } from 'lucide-react'
 import {
   ApiError,
   archiveAgent,
@@ -142,15 +142,16 @@ export default function AgentsPage() {
             </>
           ) : (
             <>
-              {isArchived(a) ? (
+              {isArchived(a) && (
                 <Button variant="outline" size="sm" onClick={() => setDrawer({ kind: 'view', agent: a })}>
                   <Eye className="h-3.5 w-3.5" /> View
                 </Button>
-              ) : (
-                <Button variant="outline" size="sm" onClick={() => setDrawer({ kind: 'edit', agent: a })}>
-                  <Pencil className="h-3.5 w-3.5" /> Edit
-                </Button>
               )}
+              {/* Templates are immutable, so Clone is how one changes: it opens
+                  a create form pre-filled from this template's configuration. */}
+              <Button variant="ghost" size="sm" onClick={() => setDrawer({ kind: 'clone', source: a })}>
+                <Copy className="h-3.5 w-3.5" /> Clone
+              </Button>
               {!isArchived(a) && (
                 <Button variant="ghost" size="sm" onClick={() => setArchiving(a)}>
                   <Archive className="h-3.5 w-3.5" /> Archive
