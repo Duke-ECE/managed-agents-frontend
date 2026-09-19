@@ -15,7 +15,11 @@ import {
   createSession,
   deleteSession,
   fetchMe,
+  cancelTurn,
+  fetchIncompleteSeqs,
+  fetchRequestState,
   getTranscript,
+  isArchived,
   isPlatform,
   listAgents,
   listSessions,
@@ -25,7 +29,10 @@ import {
   turnUsage,
   PLATFORM_AGENT_ID,
   type AgentTemplate,
+  doneUsage,
+  toolResultPayload,
   type DonePayload,
+  type RequestExecutionState,
   type ErrorPayload,
   type MeInfo,
   type SessionRecord,
@@ -52,7 +59,16 @@ interface ChatMessage {
   tools: ToolEventItem[]
   done: boolean
   error: string | null
-  usage: DonePayload | null
+  usage: { input_tokens?: number; output_tokens?: number } | null
+  /**
+   * The request identity this turn was admitted under. Kept so a reconnect can
+   * replay it and be deduplicated rather than starting a second request.
+   */
+  requestId?: string
+  /** The user text that produced this turn, for a later resend. */
+  sourceText?: string
+  /** A neutral explanation shown under the bubble (e.g. a deduplicated resend). */
+  note?: string
   /** the stream broke (error/abort) mid-turn — this text was never written
    * to the durable transcript */
   partial: boolean
@@ -154,7 +170,19 @@ function ToolLine({ item }: { item: ToolEventItem }) {
   )
 }
 
-function MessageBubble({ msg }: { msg: ChatMessage }) {
+/**
+ * What the durable record says about the latest request, in the user's terms.
+ * A completed request says nothing — the transcript already shows it.
+ */
+const REQUEST_NOTICES: Record<string, string> = {
+  EXECUTION_STATUS_QUEUED: 'The last request is queued and has not started yet.',
+  EXECUTION_STATUS_RUNNING: 'The last request is still running on the server.',
+  EXECUTION_STATUS_FAILED: 'The last request ended in failure.',
+  EXECUTION_STATUS_CANCELLED: 'The last request was cancelled.',
+  EXECUTION_STATUS_INTERRUPTED: 'The last request was interrupted and may need a resend.',
+}
+
+function MessageBubble({ msg, onResend }: { msg: ChatMessage; onResend: (msg: ChatMessage) => void }) {
   if (msg.role === 'system') {
     // System-prompt record: a centered muted notice, not a chat bubble. Long
     // prompts truncate to one line; the full text is in the tooltip.
@@ -212,8 +240,20 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
           </div>
         )}
         {msg.done && msg.partial && (
-          <div className="mt-2 font-mono text-[10px] text-warn">partial — not saved</div>
+          <div className="mt-2 flex items-center gap-2 font-mono text-[10px] text-warn">
+            <span>partial — not saved</span>
+            {msg.sourceText && (
+              <button
+                type="button"
+                onClick={() => onResend(msg)}
+                className="rounded border border-warn-line px-1.5 py-0.5 text-warn transition-colors hover:bg-warn-soft"
+              >
+                resend
+              </button>
+            )}
+          </div>
         )}
+        {msg.note && <div className="mt-2 font-mono text-[10px] text-ink-500">{msg.note}</div>}
       </div>
     </div>
   )
@@ -243,6 +283,10 @@ export default function ChatPage() {
   const [titles, setTitles] = useState<Record<string, string>>({})
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  // The durable record's view of the latest request. The live stream only
+  // describes turns this browser watched, so a turn that failed, was cancelled,
+  // or is still running elsewhere is only visible here.
+  const [requestState, setRequestState] = useState<RequestExecutionState | null>(null)
   const [hasMoreHistory, setHasMoreHistory] = useState(false)
   const [loadingEarlier, setLoadingEarlier] = useState(false)
   const [streaming, setStreaming] = useState(false)
@@ -339,6 +383,12 @@ export default function ChatPage() {
   // The platform default provider is gated on whitelist membership.
   const platformBlocked = me !== null && !me.can_use_platform_llm
 
+  // Archived templates are excluded from selection only: they still resolve a
+  // session's agent_id to a display name, and the backend refuses them at
+  // admission anyway (410), so this keeps the picker from offering a choice
+  // that cannot succeed.
+  const selectableAgents = agents === null ? null : agents.filter((a) => !isArchived(a))
+
   // Default-select an agent template on a fresh /chat, once agents and
   // /api/me have both loaded. Members get the built-in Default assistant
   // (falling back to the first platform template); anyone else gets the first
@@ -347,13 +397,13 @@ export default function ChatPage() {
   // leaves the picker unselected rather than guessing at capabilities.
   const defaultAgentPickedRef = useRef(false)
   useEffect(() => {
-    if (routeId || defaultAgentPickedRef.current || !agents || !me) return
+    if (routeId || defaultAgentPickedRef.current || !selectableAgents || !me) return
     defaultAgentPickedRef.current = true
     const pick = me.can_use_platform_llm
-      ? agents.find((a) => a.id === PLATFORM_AGENT_ID) ?? agents.find((a) => isPlatform(a))
-      : agents.find((a) => !isPlatform(a) && a.llm_mode !== 'platform_default')
+      ? selectableAgents.find((a) => a.id === PLATFORM_AGENT_ID) ?? selectableAgents.find((a) => isPlatform(a))
+      : selectableAgents.find((a) => !isPlatform(a) && a.llm_mode !== 'platform_default')
     if (pick) setSelectedAgentId(pick.id)
-  }, [routeId, agents, me])
+  }, [routeId, selectableAgents, me])
 
   // Resolve the open session's template to a name. A deleted template (or
   // one missing from the list) simply shows no badge.
@@ -369,9 +419,9 @@ export default function ChatPage() {
   // but nothing in it can be picked — mainly a non-member with no private
   // templates, since members always have the built-ins.
   const hasSelectableAgent =
-    agents !== null &&
-    agents.some((a) => !(platformBlocked && a.llm_mode === 'platform_default'))
-  const noUsableAgent = !routeId && agents !== null && !hasSelectableAgent
+    selectableAgents !== null &&
+    selectableAgents.some((a) => !(platformBlocked && a.llm_mode === 'platform_default'))
+  const noUsableAgent = !routeId && selectableAgents !== null && !hasSelectableAgent
 
   // Load the transcript whenever the URL picks a session. SWR: a cached
   // transcript renders instantly while the network copy revalidates in the
@@ -420,6 +470,23 @@ export default function ChatPage() {
         setMessages(fresh)
         cache.set(routeId, fresh)
         loadedSeqsRef.current = new Set(turns.map((t) => t.seq))
+        // The flat transcript cannot say that a turn was cut short; the
+        // canonical record can. Mark those turns so a reload does not present
+        // unfinished output as if it had completed.
+        void fetchIncompleteSeqs(routeId)
+          .then((incomplete) => {
+            if (cancelled || Object.keys(incomplete).length === 0) return
+            // The existing "partial — not saved" marker already says this;
+            // adding a note too would say it twice.
+            const mark = (list: ChatMessage[]) =>
+              list.map((m) => (m.seq !== undefined && incomplete[m.seq] ? { ...m, partial: true } : m))
+            setMessages((current) => {
+              const marked = mark(current)
+              cache.set(routeId, marked)
+              return marked
+            })
+          })
+          .catch(() => {})
         oldestSeqRef.current = turns.length > 0 ? turns[0].seq : null
         historyHasMoreRef.current[routeId] = page.has_more
         setHasMoreHistory(page.has_more)
@@ -445,6 +512,9 @@ export default function ChatPage() {
         }
       })
       .finally(() => { if (!cancelled) setHistoryLoading(false) })
+    fetchRequestState(routeId)
+      .then((state) => { if (!cancelled) setRequestState(state) })
+      .catch(() => { if (!cancelled) setRequestState(null) })
     return () => {
       cancelled = true
       // Cache live turns when navigating away so revisiting renders instantly;
@@ -465,6 +535,24 @@ export default function ChatPage() {
   const stop = useCallback(() => {
     abortRef.current?.abort()
   }, [])
+
+  // Cancel a turn this browser is not streaming — one running on another
+  // replica, or one left running after the connection dropped. Aborting a fetch
+  // cannot reach either, which is why the runtime has its own cancel RPC.
+  const cancelRemoteTurn = useCallback(
+    async (sessionId: string, requestMessageId: string) => {
+      const accepted = await cancelTurn(sessionId, requestMessageId)
+      // Re-read the record: cancellation is cooperative, so the runtime may take
+      // a moment to stop and write the terminal state.
+      const state = await fetchRequestState(sessionId).catch(() => null)
+      setRequestState(
+        accepted && state
+          ? state
+          : { request_message_id: requestMessageId, status: 'EXECUTION_STATUS_CANCELLED', cancellation_requested: true },
+      )
+    },
+    [],
+  )
 
   const newChat = useCallback(() => {
     if (routeId !== null) {
@@ -566,7 +654,7 @@ export default function ChatPage() {
   )
 
   const send = useCallback(
-    async (content: string) => {
+    async (content: string, opts?: { clientRequestId?: string; replaceId?: number }) => {
       const text = content.trim()
       if (!text || streaming || historyLoading || sessionEnded || sessionMissing || historyError) return
       // Every session runs an agent template — a fresh chat can't start without one.
@@ -579,11 +667,27 @@ export default function ChatPage() {
       const assistantMsg: ChatMessage = {
         id: nextMsgId.current++, role: 'assistant', text: '',
         tools: [], done: false, error: null, usage: null, partial: false,
+        sourceText: text,
       }
-      setMessages((msgs) => [...msgs, userMsg, assistantMsg])
+      // A resend re-drives the same bubble under the identity the turn was
+      // already admitted with, so session-manager recognises the request
+      // instead of admitting a second one.
+      let targetId = assistantMsg.id
+      if (opts?.replaceId !== undefined) {
+        targetId = opts.replaceId
+        setMessages((msgs) =>
+          msgs.map((m) =>
+            m.id === targetId
+              ? { ...m, text: '', tools: [], done: false, error: null, usage: null, partial: false, note: undefined }
+              : m,
+          ),
+        )
+      } else {
+        setMessages((msgs) => [...msgs, userMsg, assistantMsg])
+      }
       setStreaming(true)
       const patch = (fn: (m: ChatMessage) => ChatMessage) =>
-        setMessages((msgs) => msgs.map((m) => (m.id === assistantMsg.id ? fn(m) : m)))
+        setMessages((msgs) => msgs.map((m) => (m.id === targetId ? fn(m) : m)))
 
       try {
         let sid = routeId
@@ -608,8 +712,9 @@ export default function ChatPage() {
 
         const controller = new AbortController()
         abortRef.current = controller
-        await streamSessionMessage(sid, text, {
+        const requestId = await streamSessionMessage(sid, text, {
           signal: controller.signal,
+          clientRequestId: opts?.clientRequestId,
           onEvent: (event, data) => {
             switch (event) {
               case 'text_delta': {
@@ -627,7 +732,7 @@ export default function ChatPage() {
               case 'tool_result':
                 patch((m) => ({
                   ...m,
-                  tools: [...m.tools, { kind: event as ToolEventItem['kind'], data }],
+                  tools: [...m.tools, { kind: event as ToolEventItem['kind'], data: toolResultPayload(data) }],
                 }))
                 break
               case 'error': {
@@ -646,18 +751,29 @@ export default function ChatPage() {
                 break
               }
               case 'done':
-                patch((m) => ({ ...m, done: true, usage: (data as DonePayload) ?? null }))
+                // Normalize here so the renderer only ever sees flat counts,
+                // whether the backend streamed the v1 frame or the durable one.
+                patch((m) => ({ ...m, done: true, usage: doneUsage(data as DonePayload) }))
                 break
               default:
                 break
             }
           },
         })
-        // The stream ended without a done frame (connection dropped cleanly
-        // mid-turn) — whatever text streamed is not in the transcript.
-        patch((m) =>
-          m.done ? m : { ...m, done: true, partial: m.text.length > 0 || m.tools.length > 0 },
-        )
+        // Record the identity the backend confirmed, then mark an unterminated
+        // turn: a stream that ended without a done frame (connection dropped
+        // mid-turn) leaves text that was never written to the transcript.
+        patch((m) => ({
+          ...(m.done ? m : { ...m, done: true, partial: m.text.length > 0 || m.tools.length > 0 }),
+          requestId,
+          // A deduplicated resend comes back with the existing request's state
+          // and no new output. Say so plainly: the turn was accepted, it is not
+          // a failure, and the transcript already holds it.
+          note:
+            opts?.replaceId !== undefined && m.text.length === 0 && m.tools.length === 0 && !m.error
+              ? 'already accepted — this turn is on the server; reload to see it'
+              : m.note,
+        }))
       } catch (err) {
         if (isAbortError(err)) {
           // Stop button (or navigation): keep the partial text, flag it.
@@ -687,6 +803,16 @@ export default function ChatPage() {
       }
     },
     [routeId, selectedAgentId, streaming, historyLoading, sessionEnded, sessionMissing, historyError, navigate],
+  )
+
+  // Resending an interrupted turn replays it under the identity it was already
+  // admitted with, so the server deduplicates instead of running it twice.
+  const resend = useCallback(
+    (msg: ChatMessage) => {
+      if (!msg.sourceText || !msg.requestId) return
+      void send(msg.sourceText, { clientRequestId: msg.requestId, replaceId: msg.id })
+    },
+    [send],
   )
 
   // A fresh chat can send once an agent template is selected; an open session
@@ -729,7 +855,7 @@ export default function ChatPage() {
             <>
               {/* Agent picker — new chats only; the template then governs the
                   session's LLM, system prompt, and tools. */}
-              {!routeId && agents !== null && agents.length > 0 && (
+              {!routeId && selectableAgents !== null && selectableAgents.length > 0 && (
                 <select
                   value={selectedAgentId}
                   onChange={(e) => setSelectedAgentId(e.target.value)}
@@ -737,7 +863,7 @@ export default function ChatPage() {
                   className="h-8 rounded-lg border border-ink-700 bg-ink-850 px-2 text-[12px] text-ink-100 transition-colors focus:border-accent focus:outline-none"
                 >
                   <option value="" disabled>Select an agent…</option>
-                  {agents.map((a) => {
+                  {selectableAgents.map((a) => {
                     // platform_default templates need platform-LLM access;
                     // without it they would 403 on send — disable them.
                     const gated = platformBlocked && a.llm_mode === 'platform_default'
@@ -835,6 +961,21 @@ export default function ChatPage() {
                 </button>
               </div>
             )}
+            {!streaming && requestState && REQUEST_NOTICES[requestState.status] && (
+              <div className="mb-3 flex items-center gap-2 rounded-lg border border-warn-line bg-warn-soft px-3 py-1.5 text-[11px] text-warn">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                <span>{REQUEST_NOTICES[requestState.status]}</span>
+                {requestState.status === 'EXECUTION_STATUS_RUNNING' && routeId && (
+                  <button
+                    type="button"
+                    onClick={() => void cancelRemoteTurn(routeId, requestState.request_message_id)}
+                    className="rounded border border-warn-line px-1.5 py-0.5 text-warn transition-colors hover:bg-warn-soft"
+                  >
+                    cancel
+                  </button>
+                )}
+              </div>
+            )}
             {historyLoading && (
               <div className="flex h-full items-center justify-center gap-2 text-[13px] text-ink-500">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading conversation…
@@ -855,7 +996,9 @@ export default function ChatPage() {
                 </p>
               </div>
             )}
-            {messages.map((msg) => <MessageBubble key={msg.id} msg={msg} />)}
+            {messages.map((msg) => (
+              <MessageBubble key={msg.id} msg={msg} onResend={(m) => void resend(m)} />
+            ))}
             <div ref={bottomRef} />
           </div>
 

@@ -78,9 +78,72 @@ export interface ErrorPayload {
   retryable?: boolean
 }
 
+/**
+ * The `done` frame's payload. The v1 contract carries flat token counts; the
+ * durable (v2) contract carries per-model-call totals under `aggregate_usage`
+ * plus the request identity and terminal status. Both are accepted so the
+ * console works before and after the cutover flips the backend's chat path.
+ */
 export interface DonePayload {
   input_tokens?: number
   output_tokens?: number
+  request_message_id?: string
+  status?: string
+  revision?: number
+  aggregate_usage?: {
+    input_tokens?: number
+    output_tokens?: number
+    total_tokens?: number
+  }
+}
+
+/**
+ * Total token usage from a done frame, whichever contract produced it, or null
+ * when the provider reported none. A v2 stream aggregates per model call, so a
+ * tool-loop turn still shows one total.
+ */
+export function doneUsage(payload: DonePayload | null | undefined): { input_tokens: number; output_tokens: number } | null {
+  if (!payload) return null
+  const input = numberOr(payload.aggregate_usage?.input_tokens) ?? numberOr(payload.input_tokens)
+  const output = numberOr(payload.aggregate_usage?.output_tokens) ?? numberOr(payload.output_tokens)
+  if (input === undefined && output === undefined) return null
+  return { input_tokens: input ?? 0, output_tokens: output ?? 0 }
+}
+
+function numberOr(value: unknown): number | undefined {
+  // protojson renders int64 as a string, so accept both.
+  if (typeof value === 'number') return value
+  if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) return Number(value)
+  return undefined
+}
+
+/**
+ * Normalize a `tool_result` frame into the shape the renderer understands.
+ * The durable contract sends ordered content blocks with a status enum; v1
+ * sends a flat ok/output/error triple. Normalizing at the boundary keeps the
+ * renderer from having to know which backend produced the frame.
+ */
+export function toolResultPayload(data: unknown): ToolResultPayload {
+  const raw = (data ?? {}) as Record<string, unknown>
+  if (typeof raw.status !== 'string' && raw.ok !== undefined) {
+    return raw as ToolResultPayload
+  }
+  const ok = raw.status === 'TOOL_RESULT_STATUS_SUCCESS'
+  const text = blocksToText(raw.content)
+  if (ok) return { ok: true, output: text }
+  return { ok: false, error: typeof raw.error_code === 'string' && raw.error_code ? raw.error_code : text || 'failed' }
+}
+
+/** Flatten the text of a session.v2 content-block array. */
+function blocksToText(content: unknown): string {
+  if (!Array.isArray(content)) return ''
+  const parts: string[] = []
+  for (const block of content) {
+    if (!block || typeof block !== 'object') continue
+    const text = (block as { text?: { text?: unknown } }).text?.text
+    if (typeof text === 'string') parts.push(text)
+  }
+  return parts.join('\n')
 }
 
 async function authHeaders(): Promise<Record<string, string>> {
@@ -259,6 +322,16 @@ export interface AgentTemplate {
   visibility: AgentVisibility
   created_at: string
   updated_at: string
+  /** Lifecycle metadata; absent while the template is active. */
+  archived_at?: string
+}
+
+/**
+ * Archived templates stay readable and cloneable and keep serving the sessions
+ * that already resolved them, but they cannot admit new ones.
+ */
+export function isArchived(agent: AgentTemplate): boolean {
+  return Boolean(agent.archived_at)
 }
 
 export function isPlatform(agent: AgentTemplate): boolean {
@@ -295,22 +368,106 @@ export async function createAgent(input: AgentInput): Promise<AgentTemplate> {
   return (await res.json()) as AgentTemplate
 }
 
-export async function updateAgent(id: string, input: AgentInput): Promise<AgentTemplate> {
-  const res = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-    body: JSON.stringify(input),
+/**
+ * Retire a template by lifecycle metadata (decision D001). Content is
+ * untouched: the template stays viewable and cloneable, and existing sessions
+ * keep running. This replaces hard deletion in the normal workflow.
+ */
+export async function archiveAgent(id: string): Promise<AgentTemplate> {
+  const res = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(id)}/archive`, {
+    method: 'POST',
+    headers: await authHeaders(),
   })
   await throwIfNotOk(res)
   return (await res.json()) as AgentTemplate
 }
 
-export async function deleteAgent(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
+
+/**
+ * The durable execution state of a session's most recent request, or null when
+ * the canonical history is unavailable (open mode, or a session with no turns).
+ *
+ * This is the only place the console can learn that a turn is still running on
+ * another replica, or ended failed/cancelled/interrupted, because the live
+ * stream only describes turns this browser watched.
+ */
+export interface RequestExecutionState {
+  request_message_id: string
+  status: string
+  cancellation_requested: boolean
+}
+
+const EXECUTION_STATUSES = new Set([
+  'EXECUTION_STATUS_QUEUED',
+  'EXECUTION_STATUS_RUNNING',
+  'EXECUTION_STATUS_COMPLETED',
+  'EXECUTION_STATUS_FAILED',
+  'EXECUTION_STATUS_CANCELLED',
+  'EXECUTION_STATUS_INTERRUPTED',
+])
+
+/**
+ * Canonical message sequences whose content is incomplete, keyed by `seq`.
+ *
+ * A cancelled or interrupted turn is persisted durable as an assistant message
+ * with status `partial` or `interrupted`, but the flat transcript route carries
+ * no status — so a reload would show unfinished model output as if it had
+ * completed. Correlating on `seq` restores that signal without moving the whole
+ * transcript view onto the canonical schema.
+ */
+export async function fetchIncompleteSeqs(sessionId: string): Promise<Record<number, string>> {
+  const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/structured?limit=100`, {
     headers: await authHeaders(),
   })
-  await throwIfNotOk(res)
+  if (!res.ok) return {}
+  const data = (await res.json()) as { messages?: Array<Record<string, unknown>> }
+  const out: Record<number, string> = {}
+  for (const message of data.messages ?? []) {
+    if (message.role !== 'MESSAGE_ROLE_ASSISTANT') continue
+    const status = typeof message.status === 'string' ? message.status : ''
+    if (status !== 'MESSAGE_STATUS_PARTIAL' && status !== 'MESSAGE_STATUS_INTERRUPTED') continue
+    const seq = Number(message.seq)
+    if (!Number.isNaN(seq)) out[seq] = status === 'MESSAGE_STATUS_PARTIAL' ? 'partial' : 'interrupted'
+  }
+  return out
+}
+
+/**
+ * Ask the runtime to cancel a turn. Independent of the live stream on purpose:
+ * a turn can be running on another replica, or still running after this browser
+ * lost the connection, and those are exactly the cases the Stop button cannot
+ * reach by aborting its own fetch.
+ */
+export async function cancelTurn(sessionId: string, requestMessageId?: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify(requestMessageId ? { request_message_id: requestMessageId } : {}),
+  })
+  if (!res.ok) return false
+  return true
+}
+
+export async function fetchRequestState(sessionId: string): Promise<RequestExecutionState | null> {
+  const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/structured?limit=50`, {
+    headers: await authHeaders(),
+  })
+  // A deployment without session.v2 answers 501; that is not an error here.
+  if (!res.ok) return null
+  const data = (await res.json()) as { messages?: Array<Record<string, unknown>> }
+  // Only an initiating root carries `request`, so the last one is the session's
+  // most recent request.
+  const roots = (data.messages ?? []).filter((m) => m.request && typeof m.request === 'object')
+  const root = roots[roots.length - 1]
+  if (!root) return null
+  const request = root.request as Record<string, unknown>
+  const status = typeof request.status === 'string' ? request.status : ''
+  if (!EXECUTION_STATUSES.has(status)) return null
+  return {
+    request_message_id: typeof root.id === 'string' ? root.id : '',
+    status,
+    cancellation_requested: request.cancellation_requested === true,
+  }
 }
 
 export interface SessionPage {
@@ -397,6 +554,23 @@ function parseFrame(frame: string): { event: string; data: unknown } | null {
 export interface StreamOptions {
   signal: AbortSignal
   onEvent: (event: SseEventName, data: unknown) => void
+  /**
+   * Replay an id already used for this submission. Reconnecting with the same
+   * id lets session-manager recognise the request instead of admitting a second
+   * one; omitted, a fresh id is generated per submission.
+   */
+  clientRequestId?: string
+}
+
+/**
+ * A stable, URL-safe request id. The alphabet matches what the backend accepts
+ * (and itself generates), so the id survives being echoed in a header and
+ * replayed on a reconnect.
+ */
+export function newRequestId(): string {
+  const bytes = new Uint8Array(8)
+  crypto.getRandomValues(bytes)
+  return 'req-' + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 // POST a message and consume the SSE response stream manually
@@ -404,16 +578,24 @@ export interface StreamOptions {
 export async function streamSessionMessage(
   sessionId: string,
   content: string,
-  { signal, onEvent }: StreamOptions,
-): Promise<void> {
+  { signal, onEvent, clientRequestId }: StreamOptions,
+): Promise<string> {
+  const requestId = clientRequestId ?? newRequestId()
   const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Client-Request-Id': requestId,
+      ...(await authHeaders()),
+    },
     body: JSON.stringify({ content }),
     signal,
   })
   await throwIfNotOk(res)
   if (!res.body) throw new Error('Response has no body stream')
+  // The backend confirms the identity it accepted, which may differ from the
+  // one sent; reconnect with what it confirmed.
+  const confirmed = res.headers.get('X-Client-Request-Id') || requestId
 
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -436,4 +618,5 @@ export async function streamSessionMessage(
     const parsed = parseFrame(buffer)
     if (parsed) onEvent(parsed.event, parsed.data)
   }
+  return confirmed
 }
