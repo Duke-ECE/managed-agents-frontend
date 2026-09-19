@@ -382,13 +382,6 @@ export async function archiveAgent(id: string): Promise<AgentTemplate> {
   return (await res.json()) as AgentTemplate
 }
 
-export async function deleteAgent(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-    headers: await authHeaders(),
-  })
-  await throwIfNotOk(res)
-}
 
 /**
  * The durable execution state of a session's most recent request, or null when
