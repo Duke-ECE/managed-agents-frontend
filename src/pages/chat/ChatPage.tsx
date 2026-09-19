@@ -63,6 +63,8 @@ interface ChatMessage {
   requestId?: string
   /** The user text that produced this turn, for a later resend. */
   sourceText?: string
+  /** A neutral explanation shown under the bubble (e.g. a deduplicated resend). */
+  note?: string
   /** the stream broke (error/abort) mid-turn — this text was never written
    * to the durable transcript */
   partial: boolean
@@ -164,7 +166,7 @@ function ToolLine({ item }: { item: ToolEventItem }) {
   )
 }
 
-function MessageBubble({ msg }: { msg: ChatMessage }) {
+function MessageBubble({ msg, onResend }: { msg: ChatMessage; onResend: (msg: ChatMessage) => void }) {
   if (msg.role === 'system') {
     // System-prompt record: a centered muted notice, not a chat bubble. Long
     // prompts truncate to one line; the full text is in the tooltip.
@@ -222,8 +224,20 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
           </div>
         )}
         {msg.done && msg.partial && (
-          <div className="mt-2 font-mono text-[10px] text-warn">partial — not saved</div>
+          <div className="mt-2 flex items-center gap-2 font-mono text-[10px] text-warn">
+            <span>partial — not saved</span>
+            {msg.sourceText && (
+              <button
+                type="button"
+                onClick={() => onResend(msg)}
+                className="rounded border border-warn-line px-1.5 py-0.5 text-warn transition-colors hover:bg-warn-soft"
+              >
+                resend
+              </button>
+            )}
+          </div>
         )}
+        {msg.note && <div className="mt-2 font-mono text-[10px] text-ink-500">{msg.note}</div>}
       </div>
     </div>
   )
@@ -582,7 +596,7 @@ export default function ChatPage() {
   )
 
   const send = useCallback(
-    async (content: string) => {
+    async (content: string, opts?: { clientRequestId?: string; replaceId?: number }) => {
       const text = content.trim()
       if (!text || streaming || historyLoading || sessionEnded || sessionMissing || historyError) return
       // Every session runs an agent template — a fresh chat can't start without one.
@@ -597,10 +611,25 @@ export default function ChatPage() {
         tools: [], done: false, error: null, usage: null, partial: false,
         sourceText: text,
       }
-      setMessages((msgs) => [...msgs, userMsg, assistantMsg])
+      // A resend re-drives the same bubble under the identity the turn was
+      // already admitted with, so session-manager recognises the request
+      // instead of admitting a second one.
+      let targetId = assistantMsg.id
+      if (opts?.replaceId !== undefined) {
+        targetId = opts.replaceId
+        setMessages((msgs) =>
+          msgs.map((m) =>
+            m.id === targetId
+              ? { ...m, text: '', tools: [], done: false, error: null, usage: null, partial: false, note: undefined }
+              : m,
+          ),
+        )
+      } else {
+        setMessages((msgs) => [...msgs, userMsg, assistantMsg])
+      }
       setStreaming(true)
       const patch = (fn: (m: ChatMessage) => ChatMessage) =>
-        setMessages((msgs) => msgs.map((m) => (m.id === assistantMsg.id ? fn(m) : m)))
+        setMessages((msgs) => msgs.map((m) => (m.id === targetId ? fn(m) : m)))
 
       try {
         let sid = routeId
@@ -627,6 +656,7 @@ export default function ChatPage() {
         abortRef.current = controller
         const requestId = await streamSessionMessage(sid, text, {
           signal: controller.signal,
+          clientRequestId: opts?.clientRequestId,
           onEvent: (event, data) => {
             switch (event) {
               case 'text_delta': {
@@ -678,6 +708,13 @@ export default function ChatPage() {
         patch((m) => ({
           ...(m.done ? m : { ...m, done: true, partial: m.text.length > 0 || m.tools.length > 0 }),
           requestId,
+          // A deduplicated resend comes back with the existing request's state
+          // and no new output. Say so plainly: the turn was accepted, it is not
+          // a failure, and the transcript already holds it.
+          note:
+            opts?.replaceId !== undefined && m.text.length === 0 && m.tools.length === 0 && !m.error
+              ? 'already accepted — this turn is on the server; reload to see it'
+              : m.note,
         }))
       } catch (err) {
         if (isAbortError(err)) {
@@ -708,6 +745,16 @@ export default function ChatPage() {
       }
     },
     [routeId, selectedAgentId, streaming, historyLoading, sessionEnded, sessionMissing, historyError, navigate],
+  )
+
+  // Resending an interrupted turn replays it under the identity it was already
+  // admitted with, so the server deduplicates instead of running it twice.
+  const resend = useCallback(
+    (msg: ChatMessage) => {
+      if (!msg.sourceText || !msg.requestId) return
+      void send(msg.sourceText, { clientRequestId: msg.requestId, replaceId: msg.id })
+    },
+    [send],
   )
 
   // A fresh chat can send once an agent template is selected; an open session
@@ -876,7 +923,9 @@ export default function ChatPage() {
                 </p>
               </div>
             )}
-            {messages.map((msg) => <MessageBubble key={msg.id} msg={msg} />)}
+            {messages.map((msg) => (
+              <MessageBubble key={msg.id} msg={msg} onResend={(m) => void resend(m)} />
+            ))}
             <div ref={bottomRef} />
           </div>
 
