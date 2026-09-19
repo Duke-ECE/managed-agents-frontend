@@ -15,6 +15,7 @@ import {
   createSession,
   deleteSession,
   fetchMe,
+  cancelTurn,
   fetchIncompleteSeqs,
   fetchRequestState,
   getTranscript,
@@ -535,6 +536,24 @@ export default function ChatPage() {
     abortRef.current?.abort()
   }, [])
 
+  // Cancel a turn this browser is not streaming — one running on another
+  // replica, or one left running after the connection dropped. Aborting a fetch
+  // cannot reach either, which is why the runtime has its own cancel RPC.
+  const cancelRemoteTurn = useCallback(
+    async (sessionId: string, requestMessageId: string) => {
+      const accepted = await cancelTurn(sessionId, requestMessageId)
+      // Re-read the record: cancellation is cooperative, so the runtime may take
+      // a moment to stop and write the terminal state.
+      const state = await fetchRequestState(sessionId).catch(() => null)
+      setRequestState(
+        accepted && state
+          ? state
+          : { request_message_id: requestMessageId, status: 'EXECUTION_STATUS_CANCELLED', cancellation_requested: true },
+      )
+    },
+    [],
+  )
+
   const newChat = useCallback(() => {
     if (routeId !== null) {
       // The route change clears state via the transcript effect.
@@ -946,6 +965,15 @@ export default function ChatPage() {
               <div className="mb-3 flex items-center gap-2 rounded-lg border border-warn-line bg-warn-soft px-3 py-1.5 text-[11px] text-warn">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                 <span>{REQUEST_NOTICES[requestState.status]}</span>
+                {requestState.status === 'EXECUTION_STATUS_RUNNING' && routeId && (
+                  <button
+                    type="button"
+                    onClick={() => void cancelRemoteTurn(routeId, requestState.request_message_id)}
+                    className="rounded border border-warn-line px-1.5 py-0.5 text-warn transition-colors hover:bg-warn-soft"
+                  >
+                    cancel
+                  </button>
+                )}
               </div>
             )}
             {historyLoading && (

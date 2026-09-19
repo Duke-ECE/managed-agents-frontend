@@ -432,6 +432,22 @@ export async function fetchIncompleteSeqs(sessionId: string): Promise<Record<num
   return out
 }
 
+/**
+ * Ask the runtime to cancel a turn. Independent of the live stream on purpose:
+ * a turn can be running on another replica, or still running after this browser
+ * lost the connection, and those are exactly the cases the Stop button cannot
+ * reach by aborting its own fetch.
+ */
+export async function cancelTurn(sessionId: string, requestMessageId?: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify(requestMessageId ? { request_message_id: requestMessageId } : {}),
+  })
+  if (!res.ok) return false
+  return true
+}
+
 export async function fetchRequestState(sessionId: string): Promise<RequestExecutionState | null> {
   const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/structured?limit=50`, {
     headers: await authHeaders(),
