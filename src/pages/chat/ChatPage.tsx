@@ -56,6 +56,13 @@ interface ChatMessage {
   done: boolean
   error: string | null
   usage: { input_tokens?: number; output_tokens?: number } | null
+  /**
+   * The request identity this turn was admitted under. Kept so a reconnect can
+   * replay it and be deduplicated rather than starting a second request.
+   */
+  requestId?: string
+  /** The user text that produced this turn, for a later resend. */
+  sourceText?: string
   /** the stream broke (error/abort) mid-turn — this text was never written
    * to the durable transcript */
   partial: boolean
@@ -588,6 +595,7 @@ export default function ChatPage() {
       const assistantMsg: ChatMessage = {
         id: nextMsgId.current++, role: 'assistant', text: '',
         tools: [], done: false, error: null, usage: null, partial: false,
+        sourceText: text,
       }
       setMessages((msgs) => [...msgs, userMsg, assistantMsg])
       setStreaming(true)
@@ -617,7 +625,7 @@ export default function ChatPage() {
 
         const controller = new AbortController()
         abortRef.current = controller
-        await streamSessionMessage(sid, text, {
+        const requestId = await streamSessionMessage(sid, text, {
           signal: controller.signal,
           onEvent: (event, data) => {
             switch (event) {
@@ -664,11 +672,13 @@ export default function ChatPage() {
             }
           },
         })
-        // The stream ended without a done frame (connection dropped cleanly
-        // mid-turn) — whatever text streamed is not in the transcript.
-        patch((m) =>
-          m.done ? m : { ...m, done: true, partial: m.text.length > 0 || m.tools.length > 0 },
-        )
+        // Record the identity the backend confirmed, then mark an unterminated
+        // turn: a stream that ended without a done frame (connection dropped
+        // mid-turn) leaves text that was never written to the transcript.
+        patch((m) => ({
+          ...(m.done ? m : { ...m, done: true, partial: m.text.length > 0 || m.tools.length > 0 }),
+          requestId,
+        }))
       } catch (err) {
         if (isAbortError(err)) {
           // Stop button (or navigation): keep the partial text, flag it.

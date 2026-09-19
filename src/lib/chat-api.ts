@@ -474,6 +474,23 @@ function parseFrame(frame: string): { event: string; data: unknown } | null {
 export interface StreamOptions {
   signal: AbortSignal
   onEvent: (event: SseEventName, data: unknown) => void
+  /**
+   * Replay an id already used for this submission. Reconnecting with the same
+   * id lets session-manager recognise the request instead of admitting a second
+   * one; omitted, a fresh id is generated per submission.
+   */
+  clientRequestId?: string
+}
+
+/**
+ * A stable, URL-safe request id. The alphabet matches what the backend accepts
+ * (and itself generates), so the id survives being echoed in a header and
+ * replayed on a reconnect.
+ */
+export function newRequestId(): string {
+  const bytes = new Uint8Array(8)
+  crypto.getRandomValues(bytes)
+  return 'req-' + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 // POST a message and consume the SSE response stream manually
@@ -481,16 +498,24 @@ export interface StreamOptions {
 export async function streamSessionMessage(
   sessionId: string,
   content: string,
-  { signal, onEvent }: StreamOptions,
-): Promise<void> {
+  { signal, onEvent, clientRequestId }: StreamOptions,
+): Promise<string> {
+  const requestId = clientRequestId ?? newRequestId()
   const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Client-Request-Id': requestId,
+      ...(await authHeaders()),
+    },
     body: JSON.stringify({ content }),
     signal,
   })
   await throwIfNotOk(res)
   if (!res.body) throw new Error('Response has no body stream')
+  // The backend confirms the identity it accepted, which may differ from the
+  // one sent; reconnect with what it confirmed.
+  const confirmed = res.headers.get('X-Client-Request-Id') || requestId
 
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -513,4 +538,5 @@ export async function streamSessionMessage(
     const parsed = parseFrame(buffer)
     if (parsed) onEvent(parsed.event, parsed.data)
   }
+  return confirmed
 }
