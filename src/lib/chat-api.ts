@@ -390,6 +390,51 @@ export async function deleteAgent(id: string): Promise<void> {
   await throwIfNotOk(res)
 }
 
+/**
+ * The durable execution state of a session's most recent request, or null when
+ * the canonical history is unavailable (open mode, or a session with no turns).
+ *
+ * This is the only place the console can learn that a turn is still running on
+ * another replica, or ended failed/cancelled/interrupted, because the live
+ * stream only describes turns this browser watched.
+ */
+export interface RequestExecutionState {
+  request_message_id: string
+  status: string
+  cancellation_requested: boolean
+}
+
+const EXECUTION_STATUSES = new Set([
+  'EXECUTION_STATUS_QUEUED',
+  'EXECUTION_STATUS_RUNNING',
+  'EXECUTION_STATUS_COMPLETED',
+  'EXECUTION_STATUS_FAILED',
+  'EXECUTION_STATUS_CANCELLED',
+  'EXECUTION_STATUS_INTERRUPTED',
+])
+
+export async function fetchRequestState(sessionId: string): Promise<RequestExecutionState | null> {
+  const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/structured?limit=50`, {
+    headers: await authHeaders(),
+  })
+  // A deployment without session.v2 answers 501; that is not an error here.
+  if (!res.ok) return null
+  const data = (await res.json()) as { messages?: Array<Record<string, unknown>> }
+  // Only an initiating root carries `request`, so the last one is the session's
+  // most recent request.
+  const roots = (data.messages ?? []).filter((m) => m.request && typeof m.request === 'object')
+  const root = roots[roots.length - 1]
+  if (!root) return null
+  const request = root.request as Record<string, unknown>
+  const status = typeof request.status === 'string' ? request.status : ''
+  if (!EXECUTION_STATUSES.has(status)) return null
+  return {
+    request_message_id: typeof root.id === 'string' ? root.id : '',
+    status,
+    cancellation_requested: request.cancellation_requested === true,
+  }
+}
+
 export interface SessionPage {
   sessions: SessionRecord[]
   has_more: boolean

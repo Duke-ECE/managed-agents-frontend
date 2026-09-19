@@ -15,6 +15,7 @@ import {
   createSession,
   deleteSession,
   fetchMe,
+  fetchRequestState,
   getTranscript,
   isArchived,
   isPlatform,
@@ -29,6 +30,7 @@ import {
   doneUsage,
   toolResultPayload,
   type DonePayload,
+  type RequestExecutionState,
   type ErrorPayload,
   type MeInfo,
   type SessionRecord,
@@ -166,6 +168,18 @@ function ToolLine({ item }: { item: ToolEventItem }) {
   )
 }
 
+/**
+ * What the durable record says about the latest request, in the user's terms.
+ * A completed request says nothing — the transcript already shows it.
+ */
+const REQUEST_NOTICES: Record<string, string> = {
+  EXECUTION_STATUS_QUEUED: 'The last request is queued and has not started yet.',
+  EXECUTION_STATUS_RUNNING: 'The last request is still running on the server.',
+  EXECUTION_STATUS_FAILED: 'The last request ended in failure.',
+  EXECUTION_STATUS_CANCELLED: 'The last request was cancelled.',
+  EXECUTION_STATUS_INTERRUPTED: 'The last request was interrupted and may need a resend.',
+}
+
 function MessageBubble({ msg, onResend }: { msg: ChatMessage; onResend: (msg: ChatMessage) => void }) {
   if (msg.role === 'system') {
     // System-prompt record: a centered muted notice, not a chat bubble. Long
@@ -267,6 +281,10 @@ export default function ChatPage() {
   const [titles, setTitles] = useState<Record<string, string>>({})
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  // The durable record's view of the latest request. The live stream only
+  // describes turns this browser watched, so a turn that failed, was cancelled,
+  // or is still running elsewhere is only visible here.
+  const [requestState, setRequestState] = useState<RequestExecutionState | null>(null)
   const [hasMoreHistory, setHasMoreHistory] = useState(false)
   const [loadingEarlier, setLoadingEarlier] = useState(false)
   const [streaming, setStreaming] = useState(false)
@@ -475,6 +493,9 @@ export default function ChatPage() {
         }
       })
       .finally(() => { if (!cancelled) setHistoryLoading(false) })
+    fetchRequestState(routeId)
+      .then((state) => { if (!cancelled) setRequestState(state) })
+      .catch(() => { if (!cancelled) setRequestState(null) })
     return () => {
       cancelled = true
       // Cache live turns when navigating away so revisiting renders instantly;
@@ -901,6 +922,12 @@ export default function ChatPage() {
                   {loadingEarlier && <Loader2 className="h-3 w-3 animate-spin" />}
                   {loadingEarlier ? 'Loading…' : 'Load earlier messages'}
                 </button>
+              </div>
+            )}
+            {!streaming && requestState && REQUEST_NOTICES[requestState.status] && (
+              <div className="mb-3 flex items-center gap-2 rounded-lg border border-warn-line bg-warn-soft px-3 py-1.5 text-[11px] text-warn">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                <span>{REQUEST_NOTICES[requestState.status]}</span>
               </div>
             )}
             {historyLoading && (
