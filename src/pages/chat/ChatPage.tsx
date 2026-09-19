@@ -16,6 +16,7 @@ import {
   deleteSession,
   fetchMe,
   getTranscript,
+  isArchived,
   isPlatform,
   listAgents,
   listSessions,
@@ -339,6 +340,12 @@ export default function ChatPage() {
   // The platform default provider is gated on whitelist membership.
   const platformBlocked = me !== null && !me.can_use_platform_llm
 
+  // Archived templates are excluded from selection only: they still resolve a
+  // session's agent_id to a display name, and the backend refuses them at
+  // admission anyway (410), so this keeps the picker from offering a choice
+  // that cannot succeed.
+  const selectableAgents = agents === null ? null : agents.filter((a) => !isArchived(a))
+
   // Default-select an agent template on a fresh /chat, once agents and
   // /api/me have both loaded. Members get the built-in Default assistant
   // (falling back to the first platform template); anyone else gets the first
@@ -347,13 +354,13 @@ export default function ChatPage() {
   // leaves the picker unselected rather than guessing at capabilities.
   const defaultAgentPickedRef = useRef(false)
   useEffect(() => {
-    if (routeId || defaultAgentPickedRef.current || !agents || !me) return
+    if (routeId || defaultAgentPickedRef.current || !selectableAgents || !me) return
     defaultAgentPickedRef.current = true
     const pick = me.can_use_platform_llm
-      ? agents.find((a) => a.id === PLATFORM_AGENT_ID) ?? agents.find((a) => isPlatform(a))
-      : agents.find((a) => !isPlatform(a) && a.llm_mode !== 'platform_default')
+      ? selectableAgents.find((a) => a.id === PLATFORM_AGENT_ID) ?? selectableAgents.find((a) => isPlatform(a))
+      : selectableAgents.find((a) => !isPlatform(a) && a.llm_mode !== 'platform_default')
     if (pick) setSelectedAgentId(pick.id)
-  }, [routeId, agents, me])
+  }, [routeId, selectableAgents, me])
 
   // Resolve the open session's template to a name. A deleted template (or
   // one missing from the list) simply shows no badge.
@@ -369,9 +376,9 @@ export default function ChatPage() {
   // but nothing in it can be picked — mainly a non-member with no private
   // templates, since members always have the built-ins.
   const hasSelectableAgent =
-    agents !== null &&
-    agents.some((a) => !(platformBlocked && a.llm_mode === 'platform_default'))
-  const noUsableAgent = !routeId && agents !== null && !hasSelectableAgent
+    selectableAgents !== null &&
+    selectableAgents.some((a) => !(platformBlocked && a.llm_mode === 'platform_default'))
+  const noUsableAgent = !routeId && selectableAgents !== null && !hasSelectableAgent
 
   // Load the transcript whenever the URL picks a session. SWR: a cached
   // transcript renders instantly while the network copy revalidates in the
@@ -729,7 +736,7 @@ export default function ChatPage() {
             <>
               {/* Agent picker — new chats only; the template then governs the
                   session's LLM, system prompt, and tools. */}
-              {!routeId && agents !== null && agents.length > 0 && (
+              {!routeId && selectableAgents !== null && selectableAgents.length > 0 && (
                 <select
                   value={selectedAgentId}
                   onChange={(e) => setSelectedAgentId(e.target.value)}
@@ -737,7 +744,7 @@ export default function ChatPage() {
                   className="h-8 rounded-lg border border-ink-700 bg-ink-850 px-2 text-[12px] text-ink-100 transition-colors focus:border-accent focus:outline-none"
                 >
                   <option value="" disabled>Select an agent…</option>
-                  {agents.map((a) => {
+                  {selectableAgents.map((a) => {
                     // platform_default templates need platform-LLM access;
                     // without it they would 403 on send — disable them.
                     const gated = platformBlocked && a.llm_mode === 'platform_default'
