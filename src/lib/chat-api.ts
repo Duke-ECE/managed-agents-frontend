@@ -413,6 +413,32 @@ const EXECUTION_STATUSES = new Set([
   'EXECUTION_STATUS_INTERRUPTED',
 ])
 
+/**
+ * Canonical message sequences whose content is incomplete, keyed by `seq`.
+ *
+ * A cancelled or interrupted turn is persisted durable as an assistant message
+ * with status `partial` or `interrupted`, but the flat transcript route carries
+ * no status — so a reload would show unfinished model output as if it had
+ * completed. Correlating on `seq` restores that signal without moving the whole
+ * transcript view onto the canonical schema.
+ */
+export async function fetchIncompleteSeqs(sessionId: string): Promise<Record<number, string>> {
+  const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/structured?limit=100`, {
+    headers: await authHeaders(),
+  })
+  if (!res.ok) return {}
+  const data = (await res.json()) as { messages?: Array<Record<string, unknown>> }
+  const out: Record<number, string> = {}
+  for (const message of data.messages ?? []) {
+    if (message.role !== 'MESSAGE_ROLE_ASSISTANT') continue
+    const status = typeof message.status === 'string' ? message.status : ''
+    if (status !== 'MESSAGE_STATUS_PARTIAL' && status !== 'MESSAGE_STATUS_INTERRUPTED') continue
+    const seq = Number(message.seq)
+    if (!Number.isNaN(seq)) out[seq] = status === 'MESSAGE_STATUS_PARTIAL' ? 'partial' : 'interrupted'
+  }
+  return out
+}
+
 export async function fetchRequestState(sessionId: string): Promise<RequestExecutionState | null> {
   const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/structured?limit=50`, {
     headers: await authHeaders(),

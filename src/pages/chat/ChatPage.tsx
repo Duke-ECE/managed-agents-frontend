@@ -15,6 +15,7 @@ import {
   createSession,
   deleteSession,
   fetchMe,
+  fetchIncompleteSeqs,
   fetchRequestState,
   getTranscript,
   isArchived,
@@ -468,6 +469,23 @@ export default function ChatPage() {
         setMessages(fresh)
         cache.set(routeId, fresh)
         loadedSeqsRef.current = new Set(turns.map((t) => t.seq))
+        // The flat transcript cannot say that a turn was cut short; the
+        // canonical record can. Mark those turns so a reload does not present
+        // unfinished output as if it had completed.
+        void fetchIncompleteSeqs(routeId)
+          .then((incomplete) => {
+            if (cancelled || Object.keys(incomplete).length === 0) return
+            // The existing "partial — not saved" marker already says this;
+            // adding a note too would say it twice.
+            const mark = (list: ChatMessage[]) =>
+              list.map((m) => (m.seq !== undefined && incomplete[m.seq] ? { ...m, partial: true } : m))
+            setMessages((current) => {
+              const marked = mark(current)
+              cache.set(routeId, marked)
+              return marked
+            })
+          })
+          .catch(() => {})
         oldestSeqRef.current = turns.length > 0 ? turns[0].seq : null
         historyHasMoreRef.current[routeId] = page.has_more
         setHasMoreHistory(page.has_more)
