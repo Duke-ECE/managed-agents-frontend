@@ -259,6 +259,16 @@ export interface AgentTemplate {
   visibility: AgentVisibility
   created_at: string
   updated_at: string
+  /** Lifecycle metadata; absent while the template is active. */
+  archived_at?: string
+}
+
+/**
+ * Archived templates stay readable and cloneable and keep serving the sessions
+ * that already resolved them, but they cannot admit new ones.
+ */
+export function isArchived(agent: AgentTemplate): boolean {
+  return Boolean(agent.archived_at)
 }
 
 export function isPlatform(agent: AgentTemplate): boolean {
@@ -300,6 +310,20 @@ export async function updateAgent(id: string, input: AgentInput): Promise<AgentT
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify(input),
+  })
+  await throwIfNotOk(res)
+  return (await res.json()) as AgentTemplate
+}
+
+/**
+ * Retire a template by lifecycle metadata (decision D001). Content is
+ * untouched: the template stays viewable and cloneable, and existing sessions
+ * keep running. This replaces hard deletion in the normal workflow.
+ */
+export async function archiveAgent(id: string): Promise<AgentTemplate> {
+  const res = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(id)}/archive`, {
+    method: 'POST',
+    headers: await authHeaders(),
   })
   await throwIfNotOk(res)
   return (await res.json()) as AgentTemplate

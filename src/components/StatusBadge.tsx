@@ -29,6 +29,8 @@ const statusToneMap: Record<string, Tone> = {
   platform_default: 'blue', custom: 'cyan',
   // agent template visibility
   platform: 'purple',
+  // agent template lifecycle (archived: retired, still readable and cloneable)
+  archived: 'amber',
 }
 
 const liveStatuses = new Set(['running', 'online', 'busy', 'active', 'creating', 'retrying'])

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Bot, Copy, Eye, Pencil, Plus, ShieldX, Trash2, Wrench } from 'lucide-react'
+import { Archive, Bot, Copy, Eye, Pencil, Plus, ShieldX, Wrench } from 'lucide-react'
 import {
   ApiError,
-  deleteAgent,
+  archiveAgent,
   fetchMe,
+  isArchived,
   isPlatform,
   listAgents,
   type AgentTemplate,
@@ -29,8 +30,8 @@ export default function AgentsPage() {
   const [platformBlocked, setPlatformBlocked] = useState(false)
   // Drawer state: undefined = closed.
   const [drawer, setDrawer] = useState<AgentDrawerState | undefined>(undefined)
-  const [deleting, setDeleting] = useState<AgentTemplate | null>(null)
-  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [archiving, setArchiving] = useState<AgentTemplate | null>(null)
+  const [archiveBusy, setArchiveBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -56,21 +57,23 @@ export default function AgentsPage() {
     return () => { cancelled = true }
   }, [])
 
-  const confirmDelete = async () => {
-    if (!deleting) return
-    setDeleteBusy(true)
+  // Archiving is not deletion: the template stays in the list, so the row is
+  // updated in place rather than removed.
+  const confirmArchive = async () => {
+    if (!archiving) return
+    setArchiveBusy(true)
     try {
-      await deleteAgent(deleting.id)
-      setAgents((list) => list?.filter((a) => a.id !== deleting.id) ?? list)
-      setDeleting(null)
+      const archived = await archiveAgent(archiving.id)
+      setAgents((list) => list?.map((a) => (a.id === archived.id ? archived : a)) ?? list)
+      setArchiving(null)
     } catch (err) {
       setLoadError({
         status: err instanceof ApiError ? err.status : null,
         message: err instanceof Error ? err.message : String(err),
       })
-      setDeleting(null)
+      setArchiving(null)
     } finally {
-      setDeleteBusy(false)
+      setArchiveBusy(false)
     }
   }
 
@@ -82,6 +85,7 @@ export default function AgentsPage() {
           <div className="flex items-center gap-2">
             <div className="text-[13px] font-medium text-ink-50">{a.name}</div>
             {isPlatform(a) && <StatusBadge status="platform" label="Built-in" />}
+            {isArchived(a) && <StatusBadge status="archived" label="Archived" />}
           </div>
           {a.description && (
             <div className="mt-0.5 max-w-72 truncate text-[11px] text-ink-500" title={a.description}>
@@ -138,12 +142,20 @@ export default function AgentsPage() {
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={() => setDrawer({ kind: 'edit', agent: a })}>
-                <Pencil className="h-3.5 w-3.5" /> Edit
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setDeleting(a)}>
-                <Trash2 className="h-3.5 w-3.5" /> Delete
-              </Button>
+              {isArchived(a) ? (
+                <Button variant="outline" size="sm" onClick={() => setDrawer({ kind: 'view', agent: a })}>
+                  <Eye className="h-3.5 w-3.5" /> View
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setDrawer({ kind: 'edit', agent: a })}>
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </Button>
+              )}
+              {!isArchived(a) && (
+                <Button variant="ghost" size="sm" onClick={() => setArchiving(a)}>
+                  <Archive className="h-3.5 w-3.5" /> Archive
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -203,13 +215,12 @@ export default function AgentsPage() {
       />
 
       <ConfirmDialog
-        open={deleting !== null}
-        title={`Delete ${deleting?.name ?? 'agent'}?`}
-        message="Sessions already created with this template keep running, but new sessions can no longer use it."
-        confirmLabel={deleteBusy ? 'Deleting…' : 'Delete'}
-        danger
-        onConfirm={() => void confirmDelete()}
-        onCancel={() => setDeleting(null)}
+        open={archiving !== null}
+        title={`Archive ${archiving?.name ?? 'agent'}?`}
+        message="Sessions already created with this template keep running. The template stays visible and cloneable, but new chats can no longer start from it."
+        confirmLabel={archiveBusy ? 'Archiving…' : 'Archive'}
+        onConfirm={() => void confirmArchive()}
+        onCancel={() => setArchiving(null)}
       />
     </div>
   )
