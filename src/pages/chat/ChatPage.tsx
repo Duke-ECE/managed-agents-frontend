@@ -27,6 +27,7 @@ import {
   PLATFORM_AGENT_ID,
   type AgentTemplate,
   doneUsage,
+  toolResultPayload,
   type DonePayload,
   type ErrorPayload,
   type MeInfo,
@@ -635,7 +636,7 @@ export default function ChatPage() {
               case 'tool_result':
                 patch((m) => ({
                   ...m,
-                  tools: [...m.tools, { kind: event as ToolEventItem['kind'], data }],
+                  tools: [...m.tools, { kind: event as ToolEventItem['kind'], data: toolResultPayload(data) }],
                 }))
                 break
               case 'error': {

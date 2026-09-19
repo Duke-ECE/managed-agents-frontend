@@ -117,6 +117,35 @@ function numberOr(value: unknown): number | undefined {
   return undefined
 }
 
+/**
+ * Normalize a `tool_result` frame into the shape the renderer understands.
+ * The durable contract sends ordered content blocks with a status enum; v1
+ * sends a flat ok/output/error triple. Normalizing at the boundary keeps the
+ * renderer from having to know which backend produced the frame.
+ */
+export function toolResultPayload(data: unknown): ToolResultPayload {
+  const raw = (data ?? {}) as Record<string, unknown>
+  if (typeof raw.status !== 'string' && raw.ok !== undefined) {
+    return raw as ToolResultPayload
+  }
+  const ok = raw.status === 'TOOL_RESULT_STATUS_SUCCESS'
+  const text = blocksToText(raw.content)
+  if (ok) return { ok: true, output: text }
+  return { ok: false, error: typeof raw.error_code === 'string' && raw.error_code ? raw.error_code : text || 'failed' }
+}
+
+/** Flatten the text of a session.v2 content-block array. */
+function blocksToText(content: unknown): string {
+  if (!Array.isArray(content)) return ''
+  const parts: string[] = []
+  for (const block of content) {
+    if (!block || typeof block !== 'object') continue
+    const text = (block as { text?: { text?: unknown } }).text?.text
+    if (typeof text === 'string') parts.push(text)
+  }
+  return parts.join('\n')
+}
+
 async function authHeaders(): Promise<Record<string, string>> {
   const session = await getSession()
   return session ? { Authorization: `Bearer ${session.access_token}` } : {}
