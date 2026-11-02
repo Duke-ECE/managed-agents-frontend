@@ -172,6 +172,8 @@ body {
   outline-offset: 2px;
 }
 
+.sidebar-resize-handle:focus-visible { outline: none; }
+
 :where(input, textarea, select) { accent-color: var(--color-accent); }
 
 @media (prefers-reduced-motion: reduce) {
