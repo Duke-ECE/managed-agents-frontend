@@ -10,7 +10,7 @@ import { localPreviewEnabled, localPreviewFetch } from './local-preview'
 
 const apiFetch: typeof fetch = localPreviewEnabled ? localPreviewFetch : fetch
 
-const API_BASE: string =
+export const API_BASE: string =
   import.meta.env.VITE_API_URL ?? 'https://api-managed-agent.colab.duke.edu'
 
 export class ApiError extends Error {
