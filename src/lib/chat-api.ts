@@ -10,7 +10,7 @@ import { localPreviewEnabled, localPreviewFetch } from './local-preview'
 
 const apiFetch: typeof fetch = localPreviewEnabled ? localPreviewFetch : fetch
 
-const API_BASE: string =
+export const API_BASE: string =
   import.meta.env.VITE_API_URL ?? 'https://api-managed-agent.colab.duke.edu'
 
 export class ApiError extends Error {
@@ -146,6 +146,38 @@ export async function renameSession(sessionId: string, title: string): Promise<v
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ title }),
+  })
+  await throwIfNotOk(res)
+}
+
+export interface PlatformAPIKey {
+  id: string
+  name: string
+  prefix: string
+  created_at: string
+  revoked_at?: string
+}
+
+export async function listAPIKeys(): Promise<PlatformAPIKey[]> {
+  const res = await apiFetch(`${API_BASE}/api/keys`, { headers: await authHeaders() })
+  await throwIfNotOk(res)
+  const data = await res.json() as { keys: PlatformAPIKey[] }
+  return data.keys
+}
+
+export async function createAPIKey(name: string): Promise<{ key: PlatformAPIKey; secret: string }> {
+  const res = await apiFetch(`${API_BASE}/api/keys`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify({ name }),
+  })
+  await throwIfNotOk(res)
+  return await res.json() as { key: PlatformAPIKey; secret: string }
+}
+
+export async function revokeAPIKey(id: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/api/keys/${encodeURIComponent(id)}`, {
+    method: 'DELETE', headers: await authHeaders(),
   })
   await throwIfNotOk(res)
 }

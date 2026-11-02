@@ -127,6 +127,11 @@ const users = [
   { email: 'guest@example.com', role: 'guest', provider: 'github', last_sign_in_at: ago(4), created_at: ago(8) },
 ]
 
+type PreviewKey = { id: string; name: string; prefix: string; created_at: string; revoked_at?: string }
+const keys: PreviewKey[] = [
+  { id: '00000000-0000-4000-8000-000000000001', name: 'Demo integration', prefix: 'ma_sk_8f1a3c2d', created_at: ago(2) },
+]
+
 const DATA_KEY = 'managed-agents.local-preview-data'
 if (localPreviewEnabled) {
   try {
@@ -135,18 +140,20 @@ if (localPreviewEnabled) {
       sessions?: PreviewSession[]
       transcripts?: Record<string, PreviewMessage[]>
       users?: typeof users
+      keys?: PreviewKey[]
     } | null
     if (saved?.agents) agents.splice(0, agents.length, ...saved.agents)
     if (saved?.sessions) sessions.splice(0, sessions.length, ...saved.sessions)
     if (saved?.transcripts) Object.assign(transcripts, saved.transcripts)
     if (saved?.users) users.splice(0, users.length, ...saved.users)
+    if (saved?.keys) keys.splice(0, keys.length, ...saved.keys)
   } catch {
     // Corrupt preview fixtures fall back to the sample set above.
   }
 }
 
 function savePreviewData(): void {
-  sessionStorage.setItem(DATA_KEY, JSON.stringify({ agents, sessions, transcripts, users }))
+  sessionStorage.setItem(DATA_KEY, JSON.stringify({ agents, sessions, transcripts, users, keys }))
 }
 
 const json = (data: unknown, status = 200) => Response.json(data, { status })
@@ -165,6 +172,24 @@ export async function localPreviewFetch(input: RequestInfo | URL, init?: Request
 
   if (path === '/api/me' && method === 'GET') {
     return json({ user_id: 'local-preview-user', email: 'preview@localhost', can_use_platform_llm: true, is_admin: true })
+  }
+
+  if (path === '/api/keys' && method === 'GET') return json({ keys })
+  if (path === '/api/keys' && method === 'POST') {
+    const name = String(body(init).name ?? '').trim()
+    if (!name) return json({ error: 'name is required' }, 400)
+    const secret = `ma_sk_${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '')}`
+    const key: PreviewKey = { id: crypto.randomUUID(), name, prefix: secret.slice(0, 14), created_at: new Date().toISOString() }
+    keys.unshift(key)
+    savePreviewData()
+    return json({ key, secret }, 201)
+  }
+  if (parts[1] === 'keys' && parts[2] && method === 'DELETE') {
+    const key = keys.find(item => item.id === parts[2] && !item.revoked_at)
+    if (!key) return json({ error: 'API key not found' }, 404)
+    key.revoked_at = new Date().toISOString()
+    savePreviewData()
+    return empty()
   }
 
   if (path === '/api/admin/users' && method === 'GET') return json({ users })
