@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AlertTriangle, Loader2, Terminal } from 'lucide-react'
 import type { Session } from '@supabase/supabase-js'
 import { authConfigured, consumeOAuthRedirect, getSession, onAuthChange } from '../lib/auth'
+import { localPreviewEnabled } from '../lib/local-preview'
 
 interface AuthState {
   session: Session | null
@@ -77,7 +78,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
   const location = useLocation()
 
-  if (!authConfigured) return <AuthConfigErrorScreen />
+  if (!authConfigured && !localPreviewEnabled) return <AuthConfigErrorScreen />
   if (loading) return <AuthLoadingScreen />
   if (!session) return <Navigate to="/login" replace state={{ from: location }} />
   return <>{children}</>
@@ -87,7 +88,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 export function RedirectIfAuthed({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
 
-  if (!authConfigured) return <AuthConfigErrorScreen />
+  if (!authConfigured && !localPreviewEnabled) return <AuthConfigErrorScreen />
   if (loading) return <AuthLoadingScreen />
   if (session) return <Navigate to="/" replace />
   return <>{children}</>

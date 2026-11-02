@@ -400,6 +400,7 @@ export default function ChatPage() {
     const cache = cacheRef.current
     const hasCached = cache.has(routeId)
     const displayed = cache.get(routeId) ?? []
+    messagesRef.current = displayed
     setMessages(displayed)
     // A cached view may include earlier pages loaded on a previous visit;
     // restore the remembered pagination flag until the fetch decides.
