@@ -4,6 +4,7 @@ import { AuthProvider, RequireAuth } from './components/AuthProvider'
 import DashboardLayout from './layouts/DashboardLayout'
 import LoginPage from './pages/login/LoginPage'
 import LandingPage from './pages/landing/LandingPage'
+import { useTheme } from './hooks/useTheme'
 
 // Route-level code splitting: the authenticated pages (and their heavy deps,
 // e.g. react-markdown on the chat page) load as separate chunks. Login stays
@@ -16,6 +17,7 @@ const AgentsPage = lazy(() => import('./pages/agents/AgentsPage'))
 const APIKeysPage = lazy(() => import('./pages/keys/APIKeysPage'))
 
 export default function App() {
+  const { theme, selectTheme } = useTheme()
   return (
     <BrowserRouter>
       <AuthProvider>
@@ -25,7 +27,7 @@ export default function App() {
           <Route
             element={
               <RequireAuth>
-                <DashboardLayout />
+                <DashboardLayout theme={theme} onSelectTheme={selectTheme} />
               </RequireAuth>
             }
           >

@@ -11,7 +11,8 @@ import {
 import DataTable, { type Column } from '../../components/DataTable'
 import StatusBadge from '../../components/StatusBadge'
 import { PageHeader, Card, EmptyState, TableSkeleton } from '../../components/Primitives'
-import ConfirmDialog, { Button } from '../../components/ConfirmDialog'
+import ConfirmDialog from '../../components/ConfirmDialog'
+import { Button } from '../../components/ui/button'
 import { formatDateTime } from '../../utils/format'
 import AgentFormDrawer, { type AgentDrawerState } from './AgentFormDrawer'
 
@@ -76,11 +77,11 @@ export default function AgentsPage() {
 
   const columns: Column<AgentTemplate>[] = [
     {
-      key: 'name', header: 'Agent',
+      key: 'name', header: 'Agent', className: 'min-w-[230px] w-[30%]',
       render: (a) => (
         <div className="leading-tight">
-          <div className="flex items-center gap-2">
-            <div className="text-[13px] font-medium text-ink-50">{a.name}</div>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="max-w-[200px] truncate text-[13px] font-medium text-ink-50" title={a.name}>{a.name}</div>
             {isPlatform(a) && <StatusBadge status="platform" label="Built-in" />}
           </div>
           {a.description && (
@@ -92,38 +93,31 @@ export default function AgentsPage() {
       ),
     },
     {
-      key: 'mode', header: 'LLM mode',
+      key: 'model', header: 'Model', className: 'min-w-[200px] w-[25%]',
       render: (a) => (
-        <StatusBadge
-          status={a.llm_mode}
-          label={a.llm_mode === 'platform_default' ? 'platform default' : 'custom'}
-        />
+        <div className="flex min-w-0 items-center gap-2">
+          <StatusBadge status={a.llm_mode} label={a.llm_mode === 'platform_default' ? 'Platform' : 'Custom'} />
+          <span className="min-w-0 truncate font-mono text-[12px] text-ink-300" title={a.llm_mode === 'custom' ? a.llm_model : 'Platform default model'}>
+            {a.llm_mode === 'custom' ? (a.llm_model || '—') : 'Default'}
+          </span>
+        </div>
       ),
     },
     {
-      key: 'model', header: 'Model',
-      render: (a) =>
-        a.llm_mode === 'custom' ? (
-          <span className="font-mono text-[12px] text-ink-300">{a.llm_model || '—'}</span>
-        ) : (
-          <span className="text-[12px] text-ink-500">platform default</span>
-        ),
-    },
-    {
-      key: 'tools', header: 'Tools',
+      key: 'tools', header: 'Tools', className: 'min-w-[120px]',
       render: (a) => (
         <span className="flex items-center gap-1.5 text-[12px] text-ink-400">
           <Wrench className="h-3 w-3 shrink-0" />
-          {a.tools.length === 0 ? 'all' : <span className="font-mono">{a.tools.join(', ')}</span>}
+          {a.tools.length === 0 ? 'All tools' : <span className="max-w-[160px] truncate font-mono" title={a.tools.join(', ')}>{a.tools.join(', ')}</span>}
         </span>
       ),
     },
     {
-      key: 'updated', header: 'Updated',
+      key: 'updated', header: 'Updated', className: 'min-w-[115px] whitespace-nowrap',
       render: (a) => <span className="text-[12px] text-ink-400">{formatDateTime(a.updated_at)}</span>,
     },
     {
-      key: 'actions', header: '',
+      key: 'actions', header: '', className: 'min-w-[190px] whitespace-nowrap',
       render: (a) => (
         <div className="flex items-center justify-end gap-2">
           {isPlatform(a) ? (
@@ -182,7 +176,7 @@ export default function AgentsPage() {
             action={<Button variant="outline" size="sm" onClick={() => void load()}>Retry</Button>}
           />
         ) : agents !== null && agents.length > 0 ? (
-          <DataTable columns={columns} rows={agents} rowKey={(a) => a.id} />
+          <DataTable columns={columns} rows={agents} rowKey={(a) => a.id} tableClassName="min-w-[900px]" />
         ) : (
           <EmptyState
             icon={<Bot className="h-5 w-5" />}

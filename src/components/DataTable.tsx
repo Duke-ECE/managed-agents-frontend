@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '../utils/format'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 
 export interface Column<T> {
   key: string
@@ -19,10 +20,11 @@ interface DataTableProps<T> {
   sortDir?: 'asc' | 'desc'
   onSort?: (key: string) => void
   pageSize?: number
+  tableClassName?: string
 }
 
 export default function DataTable<T>({
-  columns, rows, rowKey, onRowClick, sortKey, sortDir, onSort, pageSize = 8,
+  columns, rows, rowKey, onRowClick, sortKey, sortDir, onSort, pageSize = 8, tableClassName,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(1)
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
@@ -42,15 +44,14 @@ export default function DataTable<T>({
 
   return (
     <div>
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left">
-          <thead>
-            <tr className="border-b border-ink-800">
+      <Table className={cn('border-collapse text-left', tableClassName)}>
+          <TableHeader>
+            <TableRow className="border-b border-ink-800 hover:bg-transparent">
               {columns.map(col => (
-                <th
+                <TableHead
                   key={col.key}
                   className={cn(
-                    'whitespace-nowrap px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-400',
+                    'h-auto px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-400',
                     col.className,
                   )}
                 >
@@ -72,30 +73,31 @@ export default function DataTable<T>({
                   ) : (
                     col.header
                   )}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {pageRows.map(row => (
-              <tr
+              <TableRow
                 key={rowKey(row)}
                 onClick={() => onRowClick?.(row)}
+                onKeyDown={(event) => { if (onRowClick && event.target === event.currentTarget && event.key === 'Enter') onRowClick(row) }}
+                tabIndex={onRowClick ? 0 : undefined}
                 className={cn(
-                  'group border-b border-ink-800/60 transition-colors last:border-0',
-                  onRowClick && 'cursor-pointer hover:bg-ink-850/70',
+                  'group last:border-0',
+                  onRowClick && 'cursor-pointer',
                 )}
               >
                 {columns.map(col => (
-                  <td key={col.key} className={cn('px-5 py-3.5 text-[13px] text-ink-200', col.className)}>
+                  <TableCell key={col.key} className={cn('px-5 py-3.5 text-[13px] text-ink-200', col.className)}>
                     {col.render(row)}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+      </Table>
 
       {/* Pagination footer */}
       {rows.length > 0 && (
@@ -107,6 +109,7 @@ export default function DataTable<T>({
           {totalPages > 1 && (
             <div className="flex items-center gap-1">
               <button
+                aria-label="Previous page"
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={safePage === 1}
                 className="flex h-7 w-7 items-center justify-center rounded-md border border-ink-700 text-ink-400 transition-colors hover:border-ink-500 hover:text-ink-100 disabled:pointer-events-none disabled:opacity-35"
@@ -118,6 +121,8 @@ export default function DataTable<T>({
                   <span key={`e${i}`} className="px-1 text-[11px] text-ink-600">…</span>
                 ) : (
                   <button
+                    aria-label={`Page ${n}`}
+                    aria-current={n === safePage ? 'page' : undefined}
                     key={n}
                     onClick={() => setPage(n)}
                     className={cn(
@@ -132,6 +137,7 @@ export default function DataTable<T>({
                 ),
               )}
               <button
+                aria-label="Next page"
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={safePage === totalPages}
                 className="flex h-7 w-7 items-center justify-center rounded-md border border-ink-700 text-ink-400 transition-colors hover:border-ink-500 hover:text-ink-100 disabled:pointer-events-none disabled:opacity-35"

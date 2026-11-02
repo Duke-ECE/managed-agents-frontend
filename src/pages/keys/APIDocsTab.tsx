@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { API_BASE } from '../../lib/chat-api'
 import { Card } from '../../components/Primitives'
-import { Button } from '../../components/ConfirmDialog'
+import { Button } from '../../components/ui/button'
 
 const baseUrl = API_BASE.replace(/\/$/, '')
 

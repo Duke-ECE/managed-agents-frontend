@@ -1,4 +1,5 @@
 import { cn } from '../utils/format'
+import { Badge } from './ui/badge'
 
 type Tone = 'green' | 'blue' | 'amber' | 'red' | 'gray' | 'purple' | 'cyan'
 
@@ -42,9 +43,9 @@ export default function StatusBadge({ status, label }: { status: string; label?:
   const { dot, badge } = toneStyles[tone]
   const live = liveStatuses.has(status)
   return (
-    <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium', badge)}>
-      <span className={cn('h-1.5 w-1.5 rounded-full', dot, live && 'animate-pulse-dot')} />
+    <Badge className={badge}>
+      <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dot, live && 'animate-pulse-dot')} />
       {label ?? status}
-    </span>
+    </Badge>
   )
 }

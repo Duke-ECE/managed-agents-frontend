@@ -99,6 +99,31 @@
 .landing-footer { display: flex; align-items: center; justify-content: space-between; width: min(1280px, calc(100% - 72px)); min-height: 72px; margin: 0 auto; color: #777e8e; font-size: 11px; }
 .landing-footer a { display: inline-flex; align-items: center; gap: 7px; color: #999fac; }
 
+/* The product illustration stays dark; the surrounding page follows the app theme. */
+.light .landing-page { color: #101320; background: #f5f6f9; }
+.light .landing-header, .light .landing-flow, .light .landing-features { border-color: rgb(16 24 40 / .1); }
+.light .landing-brand { color: #101320; }
+.light .landing-nav a, .light .landing-footer { color: #606878; }
+.light .landing-nav a:hover, .light .landing-footer a:hover { color: #101320; }
+.light .landing-login { border-color: #d1d4dc; color: #232734; }
+.light .landing-login:hover { border-color: #9498a6; background: #e9ebf1; }
+.light .landing-hero::before { background: radial-gradient(ellipse 50% 50% at 74% 42%, rgb(33 77 190 / .08), transparent 72%), linear-gradient(rgb(16 24 40 / .018) 1px, transparent 1px), linear-gradient(90deg, rgb(16 24 40 / .018) 1px, transparent 1px); background-size: auto, 52px 52px, 52px 52px; }
+.light .landing-eyebrow, .light .landing-section-kicker { color: #606878; }
+.light .landing-hero h1 span { color: #4d5564; }
+.light .landing-hero-copy > p { color: #4d5564; }
+.light .landing-primary { border-color: #101320; background: #101320; color: #fff; }
+.light .landing-primary:hover { background: #28344d; }
+.light .landing-secondary { color: #232734; }
+.light .landing-secondary:hover { color: #0059c9; }
+.light .landing-hero-foot { color: #606878; }
+.light .landing-flow-grid > div { border-color: #d1d4dc; }
+.light .landing-flow-grid span, .light .landing-feature-top span { color: #0059c9; }
+.light .landing-flow-grid p, .light .landing-feature p { color: #606878; }
+.light .landing-feature { border-color: #dfe2e9; background: #fff; }
+.light .landing-feature-top { color: #0059c9; }
+.light .landing-end { border-color: #dfe2e9; background: radial-gradient(ellipse at 50% 110%, rgb(43 80 167 / .08), transparent 62%), #eef0f5; }
+.light .landing-footer a { color: #4d5564; }
+
 @media (max-width: 900px) {
   .landing-hero { grid-template-columns: 1fr; gap: 65px; padding-top: 82px; }
   .landing-hero-copy { max-width: 660px; }

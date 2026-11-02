@@ -3,7 +3,9 @@ import { BookOpen, KeyRound } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { createAPIKey, listAPIKeys, revokeAPIKey, type PlatformAPIKey } from '../../lib/chat-api'
 import { PageHeader, Card, EmptyState } from '../../components/Primitives'
-import ConfirmDialog, { Button } from '../../components/ConfirmDialog'
+import ConfirmDialog from '../../components/ConfirmDialog'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
 import { formatDateTime } from '../../utils/format'
 import APIDocsTab from './APIDocsTab'
 
@@ -82,7 +84,7 @@ export default function APIKeysPage() {
     <Card className="mb-4 p-5">
       <form onSubmit={create} className="flex flex-wrap items-end gap-3">
         <label className="min-w-56 flex-1 text-[12px] text-ink-400">Key name
-          <input className="mt-1 h-9 w-full rounded-lg border border-ink-700 bg-ink-850 px-3 text-ink-100" value={name} onChange={e => setName(e.target.value)} maxLength={120} required placeholder="My integration" />
+          <Input className="mt-1" value={name} onChange={e => setName(e.target.value)} maxLength={120} required placeholder="My integration" />
         </label>
         <Button type="submit" disabled={busy || !name.trim()}>Create key</Button>
       </form>
