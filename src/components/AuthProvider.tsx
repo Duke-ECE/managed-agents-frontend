@@ -90,7 +90,7 @@ export function RedirectIfAuthed({ children }: { children: ReactNode }) {
 
   if (!authConfigured && !localPreviewEnabled) return <AuthConfigErrorScreen />
   if (loading) return <AuthLoadingScreen />
-  if (session) return <Navigate to="/" replace />
+  if (session) return <Navigate to="/chat" replace />
   return <>{children}</>
 }
 

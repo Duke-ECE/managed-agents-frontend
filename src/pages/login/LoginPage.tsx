@@ -30,8 +30,10 @@ export default function LoginPage() {
     try {
       // Drop any stale OAuth deep-link so this login lands on the home page.
       consumeOAuthRedirect()
-      // On success the AuthProvider session listener routes the user in.
       await signInWithPassword(email.trim(), password)
+      // Fetch the current app bundle after sign-in. A client-side route change
+      // could keep an older pre-deployment logo and UI mounted until refresh.
+      window.location.replace(intendedPath)
     } catch (err) {
       setSigningIn(false)
       setError(err instanceof Error ? err.message : String(err))
@@ -66,7 +68,7 @@ export default function LoginPage() {
 
             {localPreviewEnabled ? (
               <div className="mt-6 space-y-3">
-                <Button className="w-full" onClick={enterLocalPreview}>Enter local preview</Button>
+                <Button className="w-full" onClick={() => { enterLocalPreview(); window.location.replace(intendedPath) }}>Enter local preview</Button>
                 <p className="text-center text-[12px] leading-relaxed text-ink-400">
                   Sample sessions and agents only. Nothing is sent to the production API.
                 </p>
