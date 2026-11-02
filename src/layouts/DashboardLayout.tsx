@@ -2,7 +2,7 @@ import { Suspense, useEffect, useRef, useState, type CSSProperties, type Pointer
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   MessagesSquare, MessageSquare, Sun, Moon, Monitor, Loader2,
-  PanelLeftOpen, PanelLeftClose, LogOut, ShieldCheck, Bot, KeyRound,
+  PanelLeftOpen, PanelLeftClose, LogOut, ShieldCheck, Bot, KeyRound, BookOpen, ExternalLink,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '../utils/format'
@@ -12,6 +12,7 @@ import { signOut } from '../lib/auth'
 import { fetchMe } from '../lib/chat-api'
 import { localPreviewEnabled } from '../lib/local-preview'
 import { NativeSelect } from '../components/ui/native-select'
+import { DOCS_URL } from '../lib/navigation'
 
 interface NavItem {
   to: string
@@ -171,6 +172,21 @@ function Sidebar({ open, isAdmin, width, resizing, onWidthChange, onResizeStateC
             )}
           </NavLink>
         ))}
+        <div className="my-3 border-t border-ink-800" />
+        <a
+          href={DOCS_URL}
+          title={compact ? 'Docs' : undefined}
+          aria-label={compact ? 'Docs' : undefined}
+          onClick={() => { if (window.innerWidth < 768) onNavigate() }}
+          className={cn(
+            'group flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-ink-400 transition-colors hover:bg-ink-500/[0.07] hover:text-ink-100',
+            compact && 'md:mx-auto md:h-10 md:w-10 md:justify-center md:px-0',
+          )}
+        >
+          <BookOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+          <span className={compact ? 'md:sr-only' : undefined}>Docs</span>
+          <ExternalLink className={cn('ml-auto h-3.5 w-3.5 text-ink-500', compact && 'md:hidden')} aria-hidden />
+        </a>
       </nav>
 
       {/* Bottom */}
