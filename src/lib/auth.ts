@@ -29,12 +29,12 @@ export async function signInWithGitHub(redirectPath = '/chat'): Promise<void> {
   if (!supabase) return
   // The OAuth round-trip drops the SPA's router state, so the intended
   // destination survives in sessionStorage; AuthProvider consumes it once a
-  // session appears. It is also encoded in redirectTo so an allow-listed
-  // Supabase setup lands on the page directly.
+  // session appears. Supabase allow-lists the exact app origin, not every
+  // route, so return to the origin before restoring the intended path.
   sessionStorage.setItem(OAUTH_REDIRECT_KEY, redirectPath)
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'github',
-    options: { redirectTo: window.location.origin + redirectPath },
+    options: { redirectTo: window.location.origin },
   })
   if (error) {
     sessionStorage.removeItem(OAUTH_REDIRECT_KEY)
