@@ -1,15 +1,16 @@
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  MessagesSquare, MessageSquare, Terminal, Sun, Moon, Loader2,
+  MessagesSquare, MessageSquare, Sun, Moon, Loader2,
   PanelLeftOpen, PanelLeftClose, LogOut, ShieldCheck, Bot,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '../utils/format'
 import { useTheme } from '../hooks/useTheme'
-import { useAuth } from '../components/AuthProvider'
+import { BrandMark, useAuth } from '../components/AuthProvider'
 import { signOut } from '../lib/auth'
 import { fetchMe } from '../lib/chat-api'
+import { localPreviewEnabled } from '../lib/local-preview'
 
 interface NavItem {
   to: string
@@ -35,7 +36,7 @@ const breadcrumbMap: Record<string, string> = {
  * The sidebar — docked on the left when open, tucked fully off-screen when
  * closed. One click on the top-left toggle switches between the two.
  */
-function Sidebar({ open, isAdmin }: { open: boolean; isAdmin: boolean }) {
+function Sidebar({ open, isAdmin, onNavigate }: { open: boolean; isAdmin: boolean; onNavigate: () => void }) {
   const { session } = useAuth()
   const user = session?.user
   const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>
@@ -50,19 +51,13 @@ function Sidebar({ open, isAdmin }: { open: boolean; isAdmin: boolean }) {
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-50 flex w-60 flex-col transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+        'fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-ink-800 bg-canvas shadow-panel transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:border-0 md:bg-transparent md:shadow-none',
         open ? 'translate-x-0' : '-translate-x-full',
       )}
     >
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2.5 px-5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[#7c3aed] shadow-lg shadow-accent/25">
-          <Terminal className="h-4 w-4 text-white" strokeWidth={2.5} />
-        </div>
-        <div className="leading-tight">
-          <div className="font-display text-[15px] font-semibold tracking-tight text-ink-50">AgentDeck</div>
-          <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-400">Managed Agents</div>
-        </div>
+      <div className="flex h-16 items-center px-5">
+        <BrandMark />
       </div>
 
       {/* Nav */}
@@ -73,9 +68,10 @@ function Sidebar({ open, isAdmin }: { open: boolean; isAdmin: boolean }) {
             key={to}
             to={to}
             end={end}
+            onClick={() => { if (window.innerWidth < 768) onNavigate() }}
             className={({ isActive }) =>
               cn(
-                'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150',
+                'group relative flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150',
                 isActive
                   ? 'bg-ink-500/[0.10] text-ink-50'
                   : 'text-ink-400 hover:bg-ink-500/[0.07] hover:text-ink-100',
@@ -150,7 +146,7 @@ function Header({
   const isDetail = segments.length > 1
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-ink-800/70 px-4">
+    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-ink-800/70 px-4 sm:px-6">
       {/* Sidebar toggle — the top-left "□" control */}
       <button
         onClick={onToggleSidebar}
@@ -165,17 +161,17 @@ function Header({
         {open ? <PanelLeftClose className="h-[18px] w-[18px]" /> : <PanelLeftOpen className="h-[18px] w-[18px]" />}
       </button>
 
-      <div className="flex items-center gap-2 text-[13px]">
+      <div className="flex min-w-0 items-center gap-2 text-[13px]">
         <span className="font-display text-[15px] font-semibold tracking-tight text-ink-50">{section}</span>
         {isDetail && (
           <>
             <span className="text-ink-500">/</span>
-            <span className="font-mono text-[12px] text-ink-300">{segments[1]}</span>
+            <span className="truncate font-mono text-[12px] text-ink-300">{segments[1]}</span>
           </>
         )}
       </div>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-3">
         <button
           onClick={onToggleTheme}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -184,9 +180,9 @@ function Header({
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
 
-        <span className="flex items-center gap-1.5 rounded-full border border-good-line bg-good-soft px-2.5 py-1 text-[11px] font-medium text-good">
+        <span className="hidden items-center gap-1.5 rounded-full border border-good-line bg-good-soft px-2.5 py-1 text-[11px] font-medium text-good sm:flex">
           <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-good" />
-          production
+          {localPreviewEnabled ? 'local preview' : 'production'}
         </span>
       </div>
     </header>
@@ -194,7 +190,7 @@ function Header({
 }
 
 export default function DashboardLayout() {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(() => window.matchMedia('(min-width: 768px)').matches)
   const { theme, toggleTheme } = useTheme()
   // The nav item is cosmetic — the backend's /api/admin/* routes are the gate.
   // A failed /api/me (network) just hides the item.
@@ -210,16 +206,17 @@ export default function DashboardLayout() {
 
   return (
     <div className="app-canvas min-h-screen">
-      <Sidebar open={open} isAdmin={isAdmin} />
+      {open && <button aria-label="Close navigation" className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden" onClick={() => setOpen(false)} />}
+      <Sidebar open={open} isAdmin={isAdmin} onNavigate={() => setOpen(false)} />
 
       {/* Foreground: the floating, rounded content panel */}
-      <div className={cn('transition-[padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]', open ? 'pl-60' : 'pl-0')}>
-        <div className="p-2">
-          <div className="flex h-[calc(100vh-1rem)] flex-col overflow-hidden rounded-2xl bg-panel shadow-panel">
+      <div className={cn('transition-[padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]', open ? 'md:pl-60' : 'pl-0')}>
+        <div className="md:p-2">
+          <div className="flex h-dvh flex-col overflow-hidden bg-panel shadow-panel md:h-[calc(100dvh-1rem)] md:rounded-2xl">
             <Header theme={theme} onToggleTheme={toggleTheme} open={open} onToggleSidebar={() => setOpen(o => !o)} />
             <main className="relative flex-1 overflow-hidden">
               <div className="focal-glow pointer-events-none absolute inset-0" aria-hidden />
-              <div className="grid-texture relative h-full overflow-y-auto px-8 py-8">
+              <div className="grid-texture relative h-full overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
                 <Suspense
                   fallback={
                     <div className="flex h-full items-center justify-center">

@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 
 export type Theme = 'dark' | 'light'
 
-const STORAGE_KEY = 'agentdeck-theme'
+const STORAGE_KEY = 'managed-agents-theme'
+const LEGACY_STORAGE_KEY = 'agentdeck-theme'
 
 function getInitialTheme(): Theme {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY)
     if (stored === 'light' || stored === 'dark') return stored
   } catch {
     /* ignore */

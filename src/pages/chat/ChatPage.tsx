@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle, Bot, CircleCheck, CircleX, Loader2, MessageSquare,
-  SendHorizontal, Square, User, Wrench,
+  PanelLeftOpen, SendHorizontal, Square, User, Wrench,
 } from 'lucide-react'
 import { Button } from '../../components/ConfirmDialog'
 import { Card, PageHeader } from '../../components/Primitives'
@@ -222,6 +222,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 /* --------------------------------- Page --------------------------------- */
 
 export default function ChatPage() {
+  const [mobileSessionsOpen, setMobileSessionsOpen] = useState(false)
   const { id: routeId = null } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -399,6 +400,7 @@ export default function ChatPage() {
     const cache = cacheRef.current
     const hasCached = cache.has(routeId)
     const displayed = cache.get(routeId) ?? []
+    messagesRef.current = displayed
     setMessages(displayed)
     // A cached view may include earlier pages loaded on a previous visit;
     // restore the remembered pagination flag until the fetch decides.
@@ -704,22 +706,34 @@ export default function ChatPage() {
           : 'Select an agent above to start chatting'
 
   return (
-    <div className="flex h-full gap-6">
-      <ChatSidebar
-        sessions={sessions}
-        error={sessionsError}
-        activeId={routeId}
-        titles={titles}
-        hasMore={sessionsHasMore}
-        loadingMore={sessionsLoadingMore}
-        onNew={newChat}
-        onSelect={(sid) => navigate(`/chat/${sid}`)}
-        onEnd={endChat}
-        onRename={renameChat}
-        onDelete={purgeChat}
-        onLoadMore={loadMoreSessions}
-        onPrefetchSession={prefetchSession}
-      />
+    <div className="relative flex h-full gap-6">
+      {mobileSessionsOpen && (
+        <button
+          aria-label="Close chat list"
+          className="absolute inset-0 z-10 bg-black/50 backdrop-blur-sm lg:hidden"
+          onClick={() => setMobileSessionsOpen(false)}
+        />
+      )}
+      <div className={cn(
+        'absolute inset-y-0 left-0 z-20 lg:static lg:z-auto lg:flex',
+        mobileSessionsOpen ? 'flex' : 'hidden',
+      )}>
+        <ChatSidebar
+          sessions={sessions}
+          error={sessionsError}
+          activeId={routeId}
+          titles={titles}
+          hasMore={sessionsHasMore}
+          loadingMore={sessionsLoadingMore}
+          onNew={() => { newChat(); setMobileSessionsOpen(false) }}
+          onSelect={(sid) => { navigate(`/chat/${sid}`); setMobileSessionsOpen(false) }}
+          onEnd={endChat}
+          onRename={renameChat}
+          onDelete={purgeChat}
+          onLoadMore={loadMoreSessions}
+          onPrefetchSession={prefetchSession}
+        />
+      </div>
 
       <div className="mx-auto flex w-full min-w-0 max-w-[860px] flex-1 flex-col">
         <PageHeader
@@ -727,6 +741,14 @@ export default function ChatPage() {
           description="Talk to a managed agent over a live SSE stream."
           actions={
             <>
+              <button
+                type="button"
+                aria-label="Open chat list"
+                onClick={() => setMobileSessionsOpen(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-ink-700 bg-ink-850 text-ink-200 lg:hidden"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </button>
               {/* Agent picker — new chats only; the template then governs the
                   session's LLM, system prompt, and tools. */}
               {!routeId && agents !== null && agents.length > 0 && (
@@ -734,7 +756,7 @@ export default function ChatPage() {
                   value={selectedAgentId}
                   onChange={(e) => setSelectedAgentId(e.target.value)}
                   title="Agent template for the new chat"
-                  className="h-8 rounded-lg border border-ink-700 bg-ink-850 px-2 text-[12px] text-ink-100 transition-colors focus:border-accent focus:outline-none"
+                  className="h-8 max-w-full rounded-lg border border-ink-700 bg-ink-850 px-2 text-[12px] text-ink-100 transition-colors focus:border-accent focus:outline-none"
                 >
                   <option value="" disabled>Select an agent…</option>
                   {agents.map((a) => {

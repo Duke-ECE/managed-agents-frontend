@@ -5,6 +5,7 @@ import { BrandMark, RedirectIfAuthed } from '../../components/AuthProvider'
 import { Button } from '../../components/ConfirmDialog'
 import { Card } from '../../components/Primitives'
 import { consumeOAuthRedirect, signInWithGitHub, signInWithPassword } from '../../lib/auth'
+import { enterLocalPreview, localPreviewEnabled } from '../../lib/local-preview'
 
 const inputCls =
   'h-9 w-full rounded-lg border border-ink-700 bg-ink-850 px-3 text-[13px] text-ink-100 placeholder:text-ink-500 transition-colors focus:border-accent focus:outline-none'
@@ -60,61 +61,73 @@ export default function LoginPage() {
               <BrandMark />
             </div>
             <p className="mt-5 text-center text-[13px] leading-relaxed text-ink-400">
-              Sign in to chat with your managed agents.
+              {localPreviewEnabled ? 'Explore the interface with local sample data.' : 'Sign in to chat with your managed agents.'}
             </p>
 
-            <form onSubmit={signInWithEmail} className="mt-6 space-y-4">
-              <label className="block">
-                <span className={labelCls}>Email</span>
-                <input
-                  type="email"
-                  required
-                  autoComplete="email"
-                  className={inputCls}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                />
-              </label>
-              <label className="block">
-                <span className={labelCls}>Password</span>
-                <input
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  className={inputCls}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
-              </label>
-              <Button type="submit" className="w-full" disabled={signingIn}>
-                {signingIn && <Loader2 className="h-4 w-4 animate-spin" />}
-                Sign in
-              </Button>
-            </form>
+            {localPreviewEnabled ? (
+              <div className="mt-6 space-y-3">
+                <Button className="w-full" onClick={enterLocalPreview}>Enter local preview</Button>
+                <p className="text-center text-[12px] leading-relaxed text-ink-400">
+                  Sample sessions and agents only. Nothing is sent to the production API.
+                </p>
+              </div>
+            ) : (
+              <>
 
-            {error && (
-              <p className="mt-4 rounded-lg border border-bad-line bg-bad-soft px-3 py-2 text-[12px] text-bad animate-fade-in">
-                {error}
-              </p>
+                <form onSubmit={signInWithEmail} className="mt-6 space-y-4">
+                  <label className="block">
+                    <span className={labelCls}>Email</span>
+                    <input
+                      type="email"
+                      required
+                      autoComplete="email"
+                      className={inputCls}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className={labelCls}>Password</span>
+                    <input
+                      type="password"
+                      required
+                      autoComplete="current-password"
+                      className={inputCls}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </label>
+                  <Button type="submit" className="w-full" disabled={signingIn}>
+                    {signingIn && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Sign in
+                  </Button>
+                </form>
+
+                {error && (
+                  <p className="mt-4 rounded-lg border border-bad-line bg-bad-soft px-3 py-2 text-[12px] text-bad animate-fade-in">
+                    {error}
+                  </p>
+                )}
+
+                <div className="my-5 flex items-center gap-3">
+                  <span className="h-px flex-1 bg-ink-700" />
+                  <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-500">
+                    or continue with GitHub
+                  </span>
+                  <span className="h-px flex-1 bg-ink-700" />
+                </div>
+
+                <Button variant="outline" className="w-full" onClick={signInWithOAuth} disabled={signingIn}>
+                  <Github className="h-4 w-4" />
+                  Sign in with GitHub
+                </Button>
+              </>
             )}
-
-            <div className="my-5 flex items-center gap-3">
-              <span className="h-px flex-1 bg-ink-700" />
-              <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-500">
-                or continue with GitHub
-              </span>
-              <span className="h-px flex-1 bg-ink-700" />
-            </div>
-
-            <Button variant="outline" className="w-full" onClick={signInWithOAuth} disabled={signingIn}>
-              <Github className="h-4 w-4" />
-              Sign in with GitHub
-            </Button>
           </Card>
           <p className="mt-6 text-center text-[11px] text-ink-500">
-            Access is limited to authorized users.
+            {localPreviewEnabled ? 'Local preview mode · development server only' : 'Access is limited to authorized users.'}
           </p>
         </div>
       </div>

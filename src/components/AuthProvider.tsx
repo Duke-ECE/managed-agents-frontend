@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { AlertTriangle, Loader2, Terminal } from 'lucide-react'
+import { AlertTriangle, Loader2 } from 'lucide-react'
 import type { Session } from '@supabase/supabase-js'
 import { authConfigured, consumeOAuthRedirect, getSession, onAuthChange } from '../lib/auth'
+import { localPreviewEnabled } from '../lib/local-preview'
 
 interface AuthState {
   session: Session | null
@@ -77,7 +78,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
   const location = useLocation()
 
-  if (!authConfigured) return <AuthConfigErrorScreen />
+  if (!authConfigured && !localPreviewEnabled) return <AuthConfigErrorScreen />
   if (loading) return <AuthLoadingScreen />
   if (!session) return <Navigate to="/login" replace state={{ from: location }} />
   return <>{children}</>
@@ -87,7 +88,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 export function RedirectIfAuthed({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
 
-  if (!authConfigured) return <AuthConfigErrorScreen />
+  if (!authConfigured && !localPreviewEnabled) return <AuthConfigErrorScreen />
   if (loading) return <AuthLoadingScreen />
   if (session) return <Navigate to="/" replace />
   return <>{children}</>
@@ -97,12 +98,10 @@ export function RedirectIfAuthed({ children }: { children: ReactNode }) {
 export function BrandMark() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[#7c3aed] shadow-lg shadow-accent/25">
-        <Terminal className="h-4 w-4 text-white" strokeWidth={2.5} />
-      </div>
+      <img src="/favicon.svg" alt="" className="h-8 w-8 shrink-0 rounded-lg" />
       <div className="leading-tight">
-        <div className="font-display text-[15px] font-semibold tracking-tight text-ink-50">AgentDeck</div>
-        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-400">Managed Agents</div>
+        <div className="font-display text-[15px] font-semibold tracking-tight text-ink-50">Managed Agents</div>
+        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-400">Console</div>
       </div>
     </div>
   )
