@@ -10,6 +10,7 @@ import { useTheme } from '../hooks/useTheme'
 import { useAuth } from '../components/AuthProvider'
 import { signOut } from '../lib/auth'
 import { fetchMe } from '../lib/chat-api'
+import { localPreviewEnabled } from '../lib/local-preview'
 
 interface NavItem {
   to: string
@@ -187,7 +188,7 @@ function Header({
 
         <span className="hidden items-center gap-1.5 rounded-full border border-good-line bg-good-soft px-2.5 py-1 text-[11px] font-medium text-good sm:flex">
           <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-good" />
-          production
+          {localPreviewEnabled ? 'local preview' : 'production'}
         </span>
       </div>
     </header>

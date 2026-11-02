@@ -6,6 +6,9 @@
  * cleared and the route guard sends the user back to /login.
  */
 import { getSession, handleUnauthorized } from './auth'
+import { localPreviewEnabled, localPreviewFetch } from './local-preview'
+
+const apiFetch: typeof fetch = localPreviewEnabled ? localPreviewFetch : fetch
 
 const API_BASE: string =
   import.meta.env.VITE_API_URL ?? 'https://api-managed-agent.colab.duke.edu'
@@ -176,7 +179,7 @@ export interface CreateSessionOptions {
 }
 
 export async function createSession(opts?: CreateSessionOptions): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/sessions`, {
+  const res = await apiFetch(`${API_BASE}/api/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     // user_id is derived from the bearer token on the backend. When an agent
@@ -193,7 +196,7 @@ export async function createSession(opts?: CreateSessionOptions): Promise<string
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+  const res = await apiFetch(`${API_BASE}/api/sessions/${sessionId}`, {
     method: 'DELETE',
     headers: await authHeaders(),
   })
@@ -202,7 +205,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 /** PATCH /api/sessions/:id/title — user rename. 204 on success. */
 export async function renameSession(sessionId: string, title: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/title`, {
+  const res = await apiFetch(`${API_BASE}/api/sessions/${sessionId}/title`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ title }),
@@ -213,7 +216,7 @@ export async function renameSession(sessionId: string, title: string): Promise<v
 /** DELETE /api/sessions/:id?purge=true — hard-deletes the session and its
  * transcript. Irreversible; pair with a danger ConfirmDialog. */
 export async function purgeSession(sessionId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}?purge=true`, {
+  const res = await apiFetch(`${API_BASE}/api/sessions/${sessionId}?purge=true`, {
     method: 'DELETE',
     headers: await authHeaders(),
   })
@@ -229,7 +232,7 @@ export interface MeInfo {
 }
 
 export async function fetchMe(): Promise<MeInfo> {
-  const res = await fetch(`${API_BASE}/api/me`, {
+  const res = await apiFetch(`${API_BASE}/api/me`, {
     headers: await authHeaders(),
   })
   await throwIfNotOk(res)
@@ -245,7 +248,7 @@ export interface Member {
 }
 
 export async function listMembers(): Promise<Member[]> {
-  const res = await fetch(`${API_BASE}/api/admin/members`, {
+  const res = await apiFetch(`${API_BASE}/api/admin/members`, {
     headers: await authHeaders(),
   })
   await throwIfNotOk(res)
@@ -254,7 +257,7 @@ export async function listMembers(): Promise<Member[]> {
 }
 
 export async function upsertMember(email: string, role: 'admin' | 'member'): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/admin/members`, {
+  const res = await apiFetch(`${API_BASE}/api/admin/members`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ email, role }),
@@ -275,7 +278,7 @@ export interface AdminUser {
 }
 
 export async function listAdminUsers(): Promise<AdminUser[]> {
-  const res = await fetch(`${API_BASE}/api/admin/users`, {
+  const res = await apiFetch(`${API_BASE}/api/admin/users`, {
     headers: await authHeaders(),
   })
   await throwIfNotOk(res)
@@ -284,7 +287,7 @@ export async function listAdminUsers(): Promise<AdminUser[]> {
 }
 
 export async function removeMember(email: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/admin/members/${encodeURIComponent(email)}`, {
+  const res = await apiFetch(`${API_BASE}/api/admin/members/${encodeURIComponent(email)}`, {
     method: 'DELETE',
     headers: await authHeaders(),
   })
@@ -350,7 +353,7 @@ export interface AgentInput {
 }
 
 export async function listAgents(): Promise<AgentTemplate[]> {
-  const res = await fetch(`${API_BASE}/api/agents`, {
+  const res = await apiFetch(`${API_BASE}/api/agents`, {
     headers: await authHeaders(),
   })
   await throwIfNotOk(res)
@@ -359,7 +362,7 @@ export async function listAgents(): Promise<AgentTemplate[]> {
 }
 
 export async function createAgent(input: AgentInput): Promise<AgentTemplate> {
-  const res = await fetch(`${API_BASE}/api/agents`, {
+  const res = await apiFetch(`${API_BASE}/api/agents`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify(input),
@@ -374,7 +377,7 @@ export async function createAgent(input: AgentInput): Promise<AgentTemplate> {
  * keep running. This replaces hard deletion in the normal workflow.
  */
 export async function archiveAgent(id: string): Promise<AgentTemplate> {
-  const res = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(id)}/archive`, {
+  const res = await apiFetch(`${API_BASE}/api/agents/${encodeURIComponent(id)}/archive`, {
     method: 'POST',
     headers: await authHeaders(),
   })
@@ -416,7 +419,7 @@ const EXECUTION_STATUSES = new Set([
  * transcript view onto the canonical schema.
  */
 export async function fetchIncompleteSeqs(sessionId: string): Promise<Record<number, string>> {
-  const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/structured?limit=100`, {
+  const res = await apiFetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/structured?limit=100`, {
     headers: await authHeaders(),
   })
   if (!res.ok) return {}
@@ -439,7 +442,7 @@ export async function fetchIncompleteSeqs(sessionId: string): Promise<Record<num
  * reach by aborting its own fetch.
  */
 export async function cancelTurn(sessionId: string, requestMessageId?: string): Promise<boolean> {
-  const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/cancel`, {
+  const res = await apiFetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/cancel`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify(requestMessageId ? { request_message_id: requestMessageId } : {}),
@@ -449,7 +452,7 @@ export async function cancelTurn(sessionId: string, requestMessageId?: string): 
 }
 
 export async function fetchRequestState(sessionId: string): Promise<RequestExecutionState | null> {
-  const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/structured?limit=50`, {
+  const res = await apiFetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/structured?limit=50`, {
     headers: await authHeaders(),
   })
   // A deployment without session.v2 answers 501; that is not an error here.
@@ -480,7 +483,7 @@ export async function listSessions(opts?: { limit?: number; offset?: number }): 
   if (opts?.limit != null) params.set('limit', String(opts.limit))
   if (opts?.offset != null) params.set('offset', String(opts.offset))
   const qs = params.toString()
-  const res = await fetch(`${API_BASE}/api/sessions${qs ? `?${qs}` : ''}`, {
+  const res = await apiFetch(`${API_BASE}/api/sessions${qs ? `?${qs}` : ''}`, {
     headers: await authHeaders(),
   })
   await throwIfNotOk(res)
@@ -503,7 +506,7 @@ export async function getTranscript(
   if (opts?.limit != null) params.set('limit', String(opts.limit))
   if (opts?.beforeSeq != null) params.set('before_seq', String(opts.beforeSeq))
   const qs = params.toString()
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages${qs ? `?${qs}` : ''}`, {
+  const res = await apiFetch(`${API_BASE}/api/sessions/${sessionId}/messages${qs ? `?${qs}` : ''}`, {
     headers: await authHeaders(),
   })
   await throwIfNotOk(res)
@@ -581,7 +584,7 @@ export async function streamSessionMessage(
   { signal, onEvent, clientRequestId }: StreamOptions,
 ): Promise<string> {
   const requestId = clientRequestId ?? newRequestId()
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages`, {
+  const res = await apiFetch(`${API_BASE}/api/sessions/${sessionId}/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

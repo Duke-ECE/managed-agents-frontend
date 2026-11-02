@@ -6,17 +6,19 @@
  */
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js'
 import { clearTranscriptStorage } from '../pages/chat/transcript-cache'
+import { localPreviewEnabled, localPreviewSession, leaveLocalPreview, onLocalPreviewAuthChange } from './local-preview'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
 export const authConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY)
 
-export const supabase: SupabaseClient | null = authConfigured
+export const supabase: SupabaseClient | null = authConfigured && !localPreviewEnabled
   ? createClient(SUPABASE_URL as string, SUPABASE_ANON_KEY as string)
   : null
 
 export async function getSession(): Promise<Session | null> {
+  if (localPreviewEnabled) return localPreviewSession()
   if (!supabase) return null
   const { data, error } = await supabase.auth.getSession()
   if (error) return null
@@ -56,6 +58,11 @@ export async function signInWithPassword(email: string, password: string): Promi
 }
 
 export async function signOut(): Promise<void> {
+  if (localPreviewEnabled) {
+    clearTranscriptStorage()
+    leaveLocalPreview()
+    return
+  }
   if (!supabase) return
   // Drop persisted transcript cache so the next account on this browser
   // never sees the previous user's conversations.
@@ -69,6 +76,11 @@ export async function signOut(): Promise<void> {
  * route guard bounces the user back to /login.
  */
 export async function handleUnauthorized(): Promise<void> {
+  if (localPreviewEnabled) {
+    clearTranscriptStorage()
+    leaveLocalPreview()
+    return
+  }
   if (!supabase) return
   clearTranscriptStorage()
   await supabase.auth.signOut({ scope: 'local' })
@@ -76,6 +88,7 @@ export async function handleUnauthorized(): Promise<void> {
 
 /** Subscribe to auth state changes. Returns an unsubscribe function. */
 export function onAuthChange(callback: (session: Session | null) => void): () => void {
+  if (localPreviewEnabled) return onLocalPreviewAuthChange(callback)
   if (!supabase) return () => {}
   const { data } = supabase.auth.onAuthStateChange((_event, session) => {
     callback(session)
