@@ -7,7 +7,7 @@
  */
 import { getSession, handleUnauthorized } from './auth'
 
-const API_BASE: string =
+export const API_BASE: string =
   import.meta.env.VITE_API_URL ?? 'https://api-managed-agent.colab.duke.edu'
 
 export class ApiError extends Error {
