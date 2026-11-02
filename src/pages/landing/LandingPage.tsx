@@ -24,6 +24,9 @@ const features = [
   },
 ]
 
+const docsUrl = 'https://duke-ece.github.io/managed-agents-docs/'
+const apiGuideUrl = `${docsUrl}developers/api-guide`
+
 function ProductPreview() {
   return (
     <div className="landing-preview" role="img" aria-label="Illustration of an application connecting to a hosted agent through the Managed Agents API">
@@ -83,7 +86,7 @@ export default function LandingPage() {
         <nav aria-label="Main navigation" className="landing-nav">
           <a href="#how-it-works">How it works</a>
           <a href="#features">Capabilities</a>
-          <Link to="/keys?tab=docs">API guide</Link>
+          <a href={docsUrl}>Docs</a>
         </nav>
         <Link className="landing-login" to={session ? destination : '/login'}>
           {session ? 'Open console' : 'Log in'} <ArrowRight size={15} />
@@ -98,7 +101,7 @@ export default function LandingPage() {
             <p>Managed Agents gives other applications a place to run agents. Configure them in one console, connect from your server with an API key, and keep conversations available across sessions.</p>
             <div className="landing-actions">
               <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
-              <Link className="landing-secondary" to="/keys?tab=docs">Explore the API <ArrowRight size={15} /></Link>
+              <a className="landing-secondary" href={apiGuideUrl}>Explore the API <ArrowRight size={15} /></a>
             </div>
             <div className="landing-hero-foot"><ShieldCheck size={15} /> Keep API keys on your server, away from browser code</div>
           </div>
@@ -140,7 +143,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="landing-footer"><span>Managed Agents · Duke ECE</span><Link to="/keys?tab=docs">API guide <ArrowRight size={13} /></Link></footer>
+      <footer className="landing-footer"><span>Managed Agents · Duke ECE</span><a href={docsUrl}>Docs <ArrowRight size={13} /></a></footer>
     </div>
   )
 }
