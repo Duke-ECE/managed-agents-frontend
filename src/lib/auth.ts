@@ -7,6 +7,7 @@
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js'
 import { clearTranscriptStorage } from '../pages/chat/transcript-cache'
 import { localPreviewEnabled, localPreviewSession, leaveLocalPreview, onLocalPreviewAuthChange } from './local-preview'
+import { CONSOLE_PATH } from './navigation'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -27,7 +28,7 @@ export async function getSession(): Promise<Session | null> {
 
 const OAUTH_REDIRECT_KEY = 'managed-agents.oauth-redirect'
 
-export async function signInWithGitHub(redirectPath = '/chat'): Promise<void> {
+export async function signInWithGitHub(redirectPath = CONSOLE_PATH): Promise<void> {
   if (!supabase) return
   // The OAuth round-trip drops the SPA's router state, so the intended
   // destination survives in sessionStorage; AuthProvider consumes it once a

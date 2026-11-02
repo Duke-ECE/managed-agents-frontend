@@ -7,6 +7,7 @@ import { Card } from '../../components/Primitives'
 import { Input } from '../../components/ui/input'
 import { consumeOAuthRedirect, signInWithGitHub, signInWithPassword } from '../../lib/auth'
 import { enterLocalPreview, localPreviewEnabled } from '../../lib/local-preview'
+import { CONSOLE_PATH } from '../../lib/navigation'
 
 const labelCls =
   'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400'
@@ -17,9 +18,9 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [signingIn, setSigningIn] = useState(false)
   const location = useLocation()
-  // Where the route guard bounced the user from (deep-link), else the chat.
+  // Where the route guard bounced the user from (deep-link), else the console.
   const from = (location.state as { from?: { pathname: string; search?: string } } | null)?.from
-  const intendedPath = from ? from.pathname + (from.search ?? '') : '/chat'
+  const intendedPath = from ? from.pathname + (from.search ?? '') : CONSOLE_PATH
 
   const signInWithEmail = async (e: FormEvent) => {
     e.preventDefault()

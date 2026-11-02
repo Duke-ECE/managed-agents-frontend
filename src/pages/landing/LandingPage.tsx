@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { AppWindow, ArrowRight, Bot, Check, Database, KeyRound, Radio, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../../components/AuthProvider'
+import { API_GUIDE_URL, CONSOLE_PATH, DOCS_URL } from '../../lib/navigation'
 import './landing.css'
 
 const features = [
@@ -24,8 +25,6 @@ const features = [
   },
 ]
 
-const docsUrl = 'https://duke-ece.github.io/managed-agents-docs/'
-const apiGuideUrl = `${docsUrl}developers/api-guide`
 
 function ProductPreview() {
   return (
@@ -74,7 +73,7 @@ function ProductPreview() {
 
 export default function LandingPage() {
   const { session } = useAuth()
-  const destination = '/agents'
+  const destination = CONSOLE_PATH
 
   return (
     <div className="landing-page">
@@ -86,7 +85,7 @@ export default function LandingPage() {
         <nav aria-label="Main navigation" className="landing-nav">
           <a href="#how-it-works">How it works</a>
           <a href="#features">Capabilities</a>
-          <a href={docsUrl}>Docs</a>
+          <a href={DOCS_URL}>Docs</a>
         </nav>
         <Link className="landing-login" to={session ? destination : '/login'}>
           {session ? 'Open console' : 'Log in'} <ArrowRight size={15} />
@@ -101,7 +100,7 @@ export default function LandingPage() {
             <p>Managed Agents gives other applications a place to run agents. Configure them in one console, connect from your server with an API key, and keep conversations available across sessions.</p>
             <div className="landing-actions">
               <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
-              <a className="landing-secondary" href={apiGuideUrl}>Explore the API <ArrowRight size={15} /></a>
+              <a className="landing-secondary" href={API_GUIDE_URL}>Explore the API <ArrowRight size={15} /></a>
             </div>
             <div className="landing-hero-foot"><ShieldCheck size={15} /> Keep API keys on your server, away from browser code</div>
           </div>
@@ -143,7 +142,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="landing-footer"><span>Managed Agents · Duke ECE</span><a href={docsUrl}>Docs <ArrowRight size={13} /></a></footer>
+      <footer className="landing-footer"><span>Managed Agents · Duke ECE</span><a href={DOCS_URL}>Docs <ArrowRight size={13} /></a></footer>
     </div>
   )
 }

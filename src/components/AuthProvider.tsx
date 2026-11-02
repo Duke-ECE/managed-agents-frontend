@@ -4,6 +4,7 @@ import { AlertTriangle, Loader2 } from 'lucide-react'
 import type { Session } from '@supabase/supabase-js'
 import { authConfigured, consumeOAuthRedirect, getSession, onAuthChange } from '../lib/auth'
 import { localPreviewEnabled } from '../lib/local-preview'
+import { CONSOLE_PATH } from '../lib/navigation'
 
 interface AuthState {
   session: Session | null
@@ -90,7 +91,7 @@ export function RedirectIfAuthed({ children }: { children: ReactNode }) {
 
   if (!authConfigured && !localPreviewEnabled) return <AuthConfigErrorScreen />
   if (loading) return <AuthLoadingScreen />
-  if (session) return <Navigate to="/chat" replace />
+  if (session) return <Navigate to={CONSOLE_PATH} replace />
   return <>{children}</>
 }
 
