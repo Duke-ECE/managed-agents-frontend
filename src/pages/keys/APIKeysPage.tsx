@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { KeyRound } from 'lucide-react'
 import { createAPIKey, listAPIKeys, revokeAPIKey, type PlatformAPIKey } from '../../lib/chat-api'
 import { PageHeader, Card, EmptyState } from '../../components/Primitives'
-import { Button } from '../../components/ConfirmDialog'
+import ConfirmDialog, { Button } from '../../components/ConfirmDialog'
 import { formatDateTime } from '../../utils/format'
 
 export default function APIKeysPage() {
@@ -11,10 +11,12 @@ export default function APIKeysPage() {
   const [secret, setSecret] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [pendingRevoke, setPendingRevoke] = useState<PlatformAPIKey | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const refresh = async () => {
     try { setKeys(await listAPIKeys()); setError('') }
-    catch (err) { setError(err instanceof Error ? err.message : String(err)) }
+    catch (err) { setKeys([]); setError(err instanceof Error ? err.message : String(err)) }
   }
   useEffect(() => { void refresh() }, [])
 
@@ -22,6 +24,8 @@ export default function APIKeysPage() {
     event.preventDefault()
     setBusy(true)
     setError('')
+    setSecret('')
+    setCopied(false)
     try {
       const result = await createAPIKey(name.trim())
       setSecret(result.secret)
@@ -33,12 +37,22 @@ export default function APIKeysPage() {
   }
 
   const revoke = async (id: string) => {
-    if (!window.confirm('Revoke this API key? Apps using it will lose access immediately.')) return
+    setPendingRevoke(null)
     setBusy(true)
     setError('')
     try { await revokeAPIKey(id); await refresh() }
     catch (err) { setError(err instanceof Error ? err.message : String(err)) }
     finally { setBusy(false) }
+  }
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(secret)
+      setCopied(true)
+      setError('')
+    } catch {
+      setError('Could not copy the key. Select and copy it manually.')
+    }
   }
 
   return <div className="mx-auto max-w-[900px]">
@@ -54,7 +68,7 @@ export default function APIKeysPage() {
         <p className="mb-2 text-[12px] text-ink-200">Copy this key now. It will not be shown again.</p>
         <div className="flex gap-2">
           <code className="min-w-0 flex-1 overflow-x-auto rounded bg-ink-900 p-2 text-[12px] text-ink-50">{secret}</code>
-          <Button type="button" variant="outline" onClick={() => void navigator.clipboard.writeText(secret)}>Copy</Button>
+          <Button type="button" variant="outline" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Button>
         </div>
       </div>}
       {error && <p role="alert" className="mt-3 text-[12px] text-bad">{error}</p>}
@@ -67,9 +81,18 @@ export default function APIKeysPage() {
               <div className="text-[13px] font-medium text-ink-100">{key.name}</div>
               <div className="text-[11px] text-ink-400">{key.prefix}… · Created {formatDateTime(key.created_at)}{key.revoked_at ? ' · Revoked' : ''}</div>
             </div>
-            {!key.revoked_at && <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void revoke(key.id)}>Revoke</Button>}
+            {!key.revoked_at && <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setPendingRevoke(key)}>Revoke</Button>}
           </li>)}
         </ul>}
     </Card>
+    <ConfirmDialog
+      open={pendingRevoke !== null}
+      title="Revoke API key?"
+      message={`Apps using ${pendingRevoke?.name ?? 'this key'} will lose access immediately.`}
+      confirmLabel="Revoke key"
+      danger
+      onConfirm={() => { if (pendingRevoke) void revoke(pendingRevoke.id) }}
+      onCancel={() => setPendingRevoke(null)}
+    />
   </div>
 }
