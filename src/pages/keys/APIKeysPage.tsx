@@ -62,7 +62,7 @@ export default function APIKeysPage() {
   }
 
   return <div className="mx-auto max-w-[900px]">
-    <PageHeader title="API Keys" description="Create server-side keys for third-party apps. Keys can chat with your existing agents and manage your sessions." />
+    <PageHeader title="API Keys" description="Connect your own apps to your agents and sessions." />
     <div role="tablist" aria-label="API key sections" className="mb-5 flex gap-1 border-b border-ink-700">
       {([['keys', 'Your keys', KeyRound], ['docs', 'API Docs', BookOpen]] as const).map(([tab, label, Icon]) => (
         <button

@@ -135,7 +135,7 @@ export default function SessionList() {
 
   return (
     <div className="mx-auto max-w-[1200px]">
-      <PageHeader title="Sessions" description="Your chat sessions, live from the session manager." />
+      <PageHeader title="Sessions" description="Find a conversation and pick up where you left off." />
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-3 animate-fade-up">

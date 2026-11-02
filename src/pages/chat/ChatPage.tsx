@@ -739,7 +739,7 @@ export default function ChatPage() {
       <div className="mx-auto flex w-full min-w-0 max-w-[860px] flex-1 flex-col">
         <PageHeader
           title="Chat"
-          description="Talk to a managed agent over a live SSE stream."
+          description="Start a conversation with one of your agents."
           actions={
             <>
               <button

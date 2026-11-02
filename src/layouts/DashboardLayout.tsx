@@ -105,6 +105,10 @@ function Sidebar({ open, isAdmin, onNavigate }: { open: boolean; isAdmin: boolea
 
       {/* Bottom */}
       <div className="px-3 py-3">
+        <div className="mb-2 flex items-center gap-2 px-3 text-[11px] text-ink-500">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent-fg" aria-hidden />
+          {localPreviewEnabled ? 'Local preview' : 'Production'}
+        </div>
         <div className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-ink-500/[0.07]">
           {avatarUrl ? (
             <img
@@ -189,10 +193,6 @@ function Header({
           </NativeSelect>
         </div>
 
-        <span className="hidden items-center gap-1.5 rounded-full border border-good-line bg-good-soft px-2.5 py-1 text-[11px] font-medium text-good sm:flex">
-          <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-good" />
-          {localPreviewEnabled ? 'local preview' : 'production'}
-        </span>
       </div>
     </header>
   )
@@ -223,8 +223,7 @@ export default function DashboardLayout({ theme, onSelectTheme }: { theme: Theme
           <div className="flex h-dvh flex-col overflow-hidden bg-panel shadow-panel md:h-[calc(100dvh-1rem)] md:rounded-2xl">
             <Header theme={theme} onSelectTheme={onSelectTheme} open={open} onToggleSidebar={() => setOpen(o => !o)} />
             <main className="relative flex-1 overflow-hidden">
-              <div className="focal-glow pointer-events-none absolute inset-0" aria-hidden />
-              <div className="grid-texture relative h-full overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+              <div className="relative h-full overflow-y-auto bg-panel px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
                 <Suspense
                   fallback={
                     <div className="flex h-full items-center justify-center">

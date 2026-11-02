@@ -33,7 +33,7 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-2xl border border-ink-800 bg-ink-900/90 shadow-card',
+        'rounded-xl border border-ink-800 bg-ink-900',
         hover && 'transition-all duration-200 hover:-translate-y-0.5 hover:border-ink-600 hover:shadow-float',
         className,
       )}
