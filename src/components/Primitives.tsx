@@ -11,12 +11,12 @@ export function PageHeader({
   actions?: ReactNode
 }) {
   return (
-    <div className="mb-8 flex items-end justify-between gap-4 animate-fade-up">
-      <div>
-        <h1 className="font-display text-[26px] font-bold tracking-tight text-ink-50">{title}</h1>
-        {description && <p className="mt-1 text-[13px] text-ink-400">{description}</p>}
+    <div className="mb-7 flex flex-wrap items-end justify-between gap-4 animate-fade-up sm:mb-8">
+      <div className="min-w-0">
+        <h1 className="font-display text-[25px] font-semibold tracking-tight text-ink-50 sm:text-[28px]">{title}</h1>
+        {description && <p className="mt-1.5 max-w-2xl text-[14px] leading-relaxed text-ink-300">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }
@@ -33,7 +33,7 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-xl border border-ink-800 bg-ink-900/80 shadow-card backdrop-blur-sm',
+        'rounded-2xl border border-ink-800 bg-ink-900/90 shadow-card',
         hover && 'transition-all duration-200 hover:-translate-y-0.5 hover:border-ink-600 hover:shadow-float',
         className,
       )}
@@ -55,7 +55,7 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-ink-700 bg-ink-900/40 px-6 py-16 text-center animate-fade-in">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-ink-700 bg-ink-850/35 px-6 py-14 text-center animate-fade-in sm:py-16">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-ink-700 bg-ink-850 text-ink-400">
         {Icon}
       </div>
