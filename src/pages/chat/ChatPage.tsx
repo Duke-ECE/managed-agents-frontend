@@ -4,7 +4,8 @@ import {
   AlertTriangle, Bot, CircleCheck, CircleX, Loader2, MessageSquare,
   PanelLeftOpen, SendHorizontal, Square, User, Wrench,
 } from 'lucide-react'
-import { Button } from '../../components/ConfirmDialog'
+import { Button } from '../../components/ui/button'
+import { NativeSelect } from '../../components/ui/native-select'
 import { Card, PageHeader } from '../../components/Primitives'
 import { cn } from '../../utils/format'
 import ChatSidebar from './ChatSidebar'
@@ -738,7 +739,7 @@ export default function ChatPage() {
       <div className="mx-auto flex w-full min-w-0 max-w-[860px] flex-1 flex-col">
         <PageHeader
           title="Chat"
-          description="Talk to a managed agent over a live SSE stream."
+          description="Start a conversation with one of your agents."
           actions={
             <>
               <button
@@ -752,7 +753,7 @@ export default function ChatPage() {
               {/* Agent picker — new chats only; the template then governs the
                   session's LLM, system prompt, and tools. */}
               {!routeId && agents !== null && agents.length > 0 && (
-                <select
+                <NativeSelect
                   value={selectedAgentId}
                   onChange={(e) => setSelectedAgentId(e.target.value)}
                   title="Agent template for the new chat"
@@ -773,7 +774,7 @@ export default function ChatPage() {
                       </option>
                     )
                   })}
-                </select>
+                </NativeSelect>
               )}
               {noUsableAgent && (
                 <p className="flex items-center gap-1.5 rounded-lg border border-warn-line bg-warn-soft px-3 py-1.5 text-[12px] text-warn">

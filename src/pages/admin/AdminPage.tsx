@@ -10,7 +10,9 @@ import {
 import DataTable, { type Column } from '../../components/DataTable'
 import StatusBadge from '../../components/StatusBadge'
 import { PageHeader, Card, EmptyState, TableSkeleton } from '../../components/Primitives'
-import { Button } from '../../components/ConfirmDialog'
+import { Button } from '../../components/ui/button'
+import { NativeSelect } from '../../components/ui/native-select'
+import { Input } from '../../components/ui/input'
 import { formatDateTime, timeAgo } from '../../utils/format'
 
 const inputCls =
@@ -102,7 +104,8 @@ export default function AdminPage() {
     {
       key: 'role', header: 'Role',
       render: (u) => (
-        <select
+        <NativeSelect
+          aria-label={`Role for ${u.email}`}
           value={u.role}
           disabled={pendingEmail === u.email}
           onChange={(e) => void changeRole(u, e.target.value as RoleChoice)}
@@ -111,7 +114,7 @@ export default function AdminPage() {
           <option value="guest">guest</option>
           <option value="member">member</option>
           <option value="admin">admin</option>
-        </select>
+        </NativeSelect>
       ),
     },
     {
@@ -149,11 +152,10 @@ export default function AdminPage() {
             <form onSubmit={addMember} className="flex flex-wrap items-end gap-4">
               <label className="block min-w-56 flex-1">
                 <span className={labelCls}>Email</span>
-                <input
+                <Input
                   type="email"
                   required
                   autoComplete="off"
-                  className={inputCls}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="teammate@duke.edu"
@@ -161,14 +163,14 @@ export default function AdminPage() {
               </label>
               <label className="block">
                 <span className={labelCls}>Role</span>
-                <select
+                <NativeSelect
                   value={role}
                   onChange={(e) => setRole(e.target.value as 'admin' | 'member')}
                   className={inputCls}
                 >
                   <option value="member">member</option>
                   <option value="admin">admin</option>
-                </select>
+                </NativeSelect>
               </label>
               <Button type="submit" disabled={submitting}>
                 <UserPlus className="h-4 w-4" />

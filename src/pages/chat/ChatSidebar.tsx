@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { CircleStop, MessageSquarePlus, MessageSquare, Pencil, Search, Trash2 } from 'lucide-react'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
 import { cn, timeAgo } from '../../utils/format'
 import type { SessionRecord } from '../../lib/chat-api'
 
@@ -80,21 +82,21 @@ export default function ChatSidebar({
   return (
     <aside className="flex w-64 shrink-0 flex-col overflow-hidden rounded-xl border border-ink-800 bg-ink-900/80 shadow-card backdrop-blur-sm">
       <div className="space-y-2 p-3">
-        <button
+        <Button
           type="button"
           onClick={onNew}
-          className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-medium text-white shadow-sm shadow-accent/25 transition-all duration-150 hover:bg-accent-hover active:scale-[0.98]"
+          className="w-full"
         >
           <MessageSquarePlus className="h-3.5 w-3.5" /> New chat
-        </button>
+        </Button>
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
-          <input
+          <Input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats…"
-            className="h-8 w-full rounded-lg border border-ink-700 bg-ink-850 pl-8 pr-2 text-[12px] text-ink-100 placeholder:text-ink-500 transition-colors focus:border-accent focus:outline-none"
+            className="h-8 pl-8 pr-2 text-[12px]"
           />
         </div>
       </div>
@@ -136,7 +138,7 @@ export default function ChatSidebar({
               )}
             >
               {renaming ? (
-                <input
+                <Input
                   type="text"
                   autoFocus
                   value={renameDraft}
@@ -146,7 +148,7 @@ export default function ChatSidebar({
                     else if (e.key === 'Escape') setRenamingId(null)
                   }}
                   onBlur={() => commitRename(s.id)}
-                  className="mx-2 my-1.5 h-7 min-w-0 flex-1 rounded-md border border-accent bg-ink-850 px-2 text-[12px] text-ink-100 focus:outline-none"
+                  className="mx-2 my-1.5 h-7 min-w-0 flex-1 border-accent px-2 text-[12px]"
                 />
               ) : (
                 <button

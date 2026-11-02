@@ -2,13 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Github, Loader2 } from 'lucide-react'
 import { BrandMark, RedirectIfAuthed } from '../../components/AuthProvider'
-import { Button } from '../../components/ConfirmDialog'
+import { Button } from '../../components/ui/button'
 import { Card } from '../../components/Primitives'
+import { Input } from '../../components/ui/input'
 import { consumeOAuthRedirect, signInWithGitHub, signInWithPassword } from '../../lib/auth'
 import { enterLocalPreview, localPreviewEnabled } from '../../lib/local-preview'
-
-const inputCls =
-  'h-9 w-full rounded-lg border border-ink-700 bg-ink-850 px-3 text-[13px] text-ink-100 placeholder:text-ink-500 transition-colors focus:border-accent focus:outline-none'
 
 const labelCls =
   'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400'
@@ -79,11 +77,10 @@ export default function LoginPage() {
                 <form onSubmit={signInWithEmail} className="mt-6 space-y-4">
                   <label className="block">
                     <span className={labelCls}>Email</span>
-                    <input
+                    <Input
                       type="email"
                       required
                       autoComplete="email"
-                      className={inputCls}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@example.com"
@@ -91,11 +88,10 @@ export default function LoginPage() {
                   </label>
                   <label className="block">
                     <span className={labelCls}>Password</span>
-                    <input
+                    <Input
                       type="password"
                       required
                       autoComplete="current-password"
-                      className={inputCls}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"

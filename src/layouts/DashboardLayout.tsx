@@ -1,16 +1,17 @@
 import { Suspense, useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  MessagesSquare, MessageSquare, Sun, Moon, Loader2,
+  MessagesSquare, MessageSquare, Sun, Moon, Monitor, Loader2,
   PanelLeftOpen, PanelLeftClose, LogOut, ShieldCheck, Bot, KeyRound,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '../utils/format'
-import { useTheme } from '../hooks/useTheme'
+import type { Theme } from '../hooks/useTheme'
 import { BrandMark, useAuth } from '../components/AuthProvider'
 import { signOut } from '../lib/auth'
 import { fetchMe } from '../lib/chat-api'
 import { localPreviewEnabled } from '../lib/local-preview'
+import { NativeSelect } from '../components/ui/native-select'
 
 interface NavItem {
   to: string
@@ -58,9 +59,9 @@ function Sidebar({ open, isAdmin, onNavigate }: { open: boolean; isAdmin: boolea
       )}
     >
       {/* Logo */}
-      <div className="flex h-16 items-center px-5">
+      <Link to="/" aria-label="Managed Agents home" className="flex h-16 items-center rounded-lg px-5 transition-opacity hover:opacity-75">
         <BrandMark />
-      </div>
+      </Link>
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
@@ -104,6 +105,10 @@ function Sidebar({ open, isAdmin, onNavigate }: { open: boolean; isAdmin: boolea
 
       {/* Bottom */}
       <div className="px-3 py-3">
+        <div className="mb-2 flex items-center gap-2 px-3 text-[11px] text-ink-500">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent-fg" aria-hidden />
+          {localPreviewEnabled ? 'Local preview' : 'Production'}
+        </div>
         <div className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-ink-500/[0.07]">
           {avatarUrl ? (
             <img
@@ -135,10 +140,10 @@ function Sidebar({ open, isAdmin, onNavigate }: { open: boolean; isAdmin: boolea
 }
 
 function Header({
-  theme, onToggleTheme, open, onToggleSidebar,
+  theme, onSelectTheme, open, onToggleSidebar,
 }: {
-  theme: 'dark' | 'light'
-  onToggleTheme: () => void
+  theme: Theme
+  onSelectTheme: (theme: Theme) => void
   open: boolean
   onToggleSidebar: () => void
 }) {
@@ -174,26 +179,27 @@ function Header({
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
-        <button
-          onClick={onToggleTheme}
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-ink-700 bg-ink-850 text-ink-300 transition-all duration-200 hover:border-ink-500 hover:text-amber-300"
-        >
-          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
+        <div className="flex h-9 items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-850 px-2.5 text-ink-300 transition-colors hover:border-ink-500">
+          {theme === 'system' ? <Monitor className="h-4 w-4" aria-hidden /> : theme === 'dark' ? <Moon className="h-4 w-4" aria-hidden /> : <Sun className="h-4 w-4" aria-hidden />}
+          <NativeSelect
+            aria-label="Theme"
+            value={theme}
+            onChange={(event) => onSelectTheme(event.target.value as Theme)}
+            className="h-full border-0 bg-transparent px-0 font-medium text-ink-200"
+          >
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </NativeSelect>
+        </div>
 
-        <span className="hidden items-center gap-1.5 rounded-full border border-good-line bg-good-soft px-2.5 py-1 text-[11px] font-medium text-good sm:flex">
-          <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-good" />
-          {localPreviewEnabled ? 'local preview' : 'production'}
-        </span>
       </div>
     </header>
   )
 }
 
-export default function DashboardLayout() {
+export default function DashboardLayout({ theme, onSelectTheme }: { theme: Theme; onSelectTheme: (theme: Theme) => void }) {
   const [open, setOpen] = useState(() => window.matchMedia('(min-width: 768px)').matches)
-  const { theme, toggleTheme } = useTheme()
   // The nav item is cosmetic — the backend's /api/admin/* routes are the gate.
   // A failed /api/me (network) just hides the item.
   const [isAdmin, setIsAdmin] = useState(false)
@@ -215,10 +221,9 @@ export default function DashboardLayout() {
       <div className={cn('transition-[padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]', open ? 'md:pl-60' : 'pl-0')}>
         <div className="md:p-2">
           <div className="flex h-dvh flex-col overflow-hidden bg-panel shadow-panel md:h-[calc(100dvh-1rem)] md:rounded-2xl">
-            <Header theme={theme} onToggleTheme={toggleTheme} open={open} onToggleSidebar={() => setOpen(o => !o)} />
+            <Header theme={theme} onSelectTheme={onSelectTheme} open={open} onToggleSidebar={() => setOpen(o => !o)} />
             <main className="relative flex-1 overflow-hidden">
-              <div className="focal-glow pointer-events-none absolute inset-0" aria-hidden />
-              <div className="grid-texture relative h-full overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+              <div className="relative h-full overflow-y-auto bg-panel px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
                 <Suspense
                   fallback={
                     <div className="flex h-full items-center justify-center">

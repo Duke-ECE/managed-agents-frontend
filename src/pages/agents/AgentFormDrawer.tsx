@@ -10,11 +10,11 @@ import {
 } from '../../lib/chat-api'
 import Drawer from '../../components/Drawer'
 import StatusBadge from '../../components/StatusBadge'
-import { Button } from '../../components/ConfirmDialog'
+import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Textarea } from '../../components/ui/textarea'
 import { cn } from '../../utils/format'
 
-const inputCls =
-  'w-full rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-[13px] text-ink-100 placeholder:text-ink-500 outline-none transition-colors focus:border-accent disabled:opacity-60'
 const labelCls =
   'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400'
 
@@ -212,10 +212,9 @@ export default function AgentFormDrawer({
 
         <div>
           <label className={labelCls}>Name</label>
-          <input
+          <Input
             required
             disabled={readOnly}
-            className={inputCls}
             value={draft.name}
             onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
             placeholder="e.g. CodeReviewer"
@@ -225,9 +224,8 @@ export default function AgentFormDrawer({
 
         <div>
           <label className={labelCls}>Description</label>
-          <input
+          <Input
             disabled={readOnly}
-            className={inputCls}
             value={draft.description}
             onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
             placeholder="What this agent is for"
@@ -237,9 +235,9 @@ export default function AgentFormDrawer({
 
         <div>
           <label className={labelCls}>System prompt</label>
-          <textarea
+          <Textarea
             disabled={readOnly}
-            className={cn(inputCls, 'h-28 resize-none leading-relaxed')}
+            className="h-28 resize-none leading-relaxed"
             value={draft.systemPrompt}
             onChange={(e) => setDraft((d) => ({ ...d, systemPrompt: e.target.value }))}
             placeholder="Define the agent's role, capabilities, and constraints…"
@@ -280,11 +278,10 @@ export default function AgentFormDrawer({
             <div className="mt-3 space-y-4">
               <div>
                 <label className={labelCls}>API key</label>
-                <input
+                <Input
                   type="password"
                   required={keyRequired}
                   disabled={readOnly}
-                  className={inputCls}
                   value={draft.apiKey}
                   onChange={(e) => setDraft((d) => ({ ...d, apiKey: e.target.value }))}
                   placeholder={editAgent ? 'leave empty to keep current key' : 'sk-…'}
@@ -294,10 +291,9 @@ export default function AgentFormDrawer({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Base URL</label>
-                  <input
+                  <Input
                     required
                     disabled={readOnly}
-                    className={inputCls}
                     value={draft.baseUrl}
                     onChange={(e) => setDraft((d) => ({ ...d, baseUrl: e.target.value }))}
                     placeholder={DEFAULT_BASE_URL}
@@ -306,10 +302,9 @@ export default function AgentFormDrawer({
                 </div>
                 <div>
                   <label className={labelCls}>Model</label>
-                  <input
+                  <Input
                     required
                     disabled={readOnly}
-                    className={inputCls}
                     value={draft.model}
                     onChange={(e) => setDraft((d) => ({ ...d, model: e.target.value }))}
                     placeholder={DEFAULT_MODEL}
