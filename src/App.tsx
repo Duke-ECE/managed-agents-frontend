@@ -12,6 +12,7 @@ const SessionList = lazy(() => import('./pages/sessions/SessionList'))
 const ChatPage = lazy(() => import('./pages/chat/ChatPage'))
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'))
 const AgentsPage = lazy(() => import('./pages/agents/AgentsPage'))
+const APIKeysPage = lazy(() => import('./pages/keys/APIKeysPage'))
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/chat/:id" element={<ChatPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/agents" element={<AgentsPage />} />
+            <Route path="/keys" element={<APIKeysPage />} />
           </Route>
         </Routes>
       </AuthProvider>
