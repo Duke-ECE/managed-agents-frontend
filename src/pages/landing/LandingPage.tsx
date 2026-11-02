@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Bot, Check, ChevronDown, KeyRound, MessageSquare, ShieldCheck, Sparkles } from 'lucide-react'
+import { AppWindow, ArrowRight, Bot, Check, Database, KeyRound, Radio, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../../components/AuthProvider'
 import './landing.css'
 
@@ -7,68 +7,71 @@ const features = [
   {
     number: '01',
     icon: Bot,
-    title: 'Make the agent yours',
-    description: 'Choose a reusable agent template with its own instructions and model configuration.',
+    title: 'Configure hosted agents',
+    description: 'Define reusable agents with their own instructions and model configuration.',
   },
   {
     number: '02',
-    icon: MessageSquare,
-    title: 'Stay in the conversation',
-    description: 'See responses as they arrive. Return to saved sessions and pick up where you left off.',
+    icon: Radio,
+    title: 'Stream conversations',
+    description: 'Your server calls the chat API and receives replies as a live event stream.',
   },
   {
     number: '03',
-    icon: KeyRound,
-    title: 'Connect your own app',
-    description: 'Create a server-side API key for access to your existing agents and sessions. Revoke it when you need to.',
+    icon: Database,
+    title: 'Keep session history',
+    description: 'Sessions and transcripts remain available so your app can resume a conversation later.',
   },
 ]
 
 function ProductPreview() {
   return (
-    <div className="landing-preview" role="img" aria-label="Illustration of an agent chat and saved sessions in the Managed Agents console">
+    <div className="landing-preview" role="img" aria-label="Illustration of an application connecting to a hosted agent through the Managed Agents API">
       <div className="landing-preview-bar">
         <span className="landing-preview-dots" aria-hidden="true"><i /><i /><i /></span>
-        <span>Managed Agents / Chat</span>
+        <span>Managed Agents / Integration</span>
         <span className="landing-preview-live"><span /> Connected</span>
       </div>
       <div className="landing-preview-body">
         <aside className="landing-preview-side" aria-hidden="true">
-          <div className="landing-preview-side-title">WORKSPACE</div>
-          <div className="landing-preview-side-item active"><MessageSquare size={13} /> Chat</div>
-          <div className="landing-preview-side-item"><Bot size={13} /> Agents</div>
+          <div className="landing-preview-side-title">CONSOLE</div>
+          <div className="landing-preview-side-item active"><Bot size={13} /> Agents</div>
           <div className="landing-preview-side-item"><KeyRound size={13} /> API Keys</div>
-          <div className="landing-preview-side-title history">RECENT SESSIONS</div>
-          <div className="landing-preview-history">Release notes summary</div>
-          <div className="landing-preview-history">Planning the next sprint</div>
+          <div className="landing-preview-side-item"><Database size={13} /> Sessions</div>
+          <div className="landing-preview-side-title history">AGENT</div>
+          <div className="landing-preview-history">Support assistant</div>
+          <div className="landing-preview-history">Model + instructions</div>
         </aside>
-        <div className="landing-preview-chat">
-          <div className="landing-preview-chat-header">
-            <span><span className="landing-preview-agent-icon"><Sparkles size={12} /></span> Default assistant</span>
-            <ChevronDown size={14} />
+        <div className="landing-preview-integration">
+          <div className="landing-preview-integration-header">
+            <span>One agent, available to your application</span>
+            <span className="landing-preview-api-label">SERVER-SIDE API</span>
           </div>
-          <div className="landing-preview-messages">
-            <div className="landing-preview-user">Help me turn these notes into a short project update.</div>
-            <div className="landing-preview-response">
-              <span className="landing-preview-response-icon"><Sparkles size={14} /></span>
-              <div>
-                <strong>Project update</strong>
-                <p>The team completed the first phase of the release and is validating the remaining integration work.</p>
-                <p>Next: review the open issues, confirm owners, and share the rollout plan.</p>
-              </div>
+          <div className="landing-preview-integration-content">
+            <div className="landing-preview-flow">
+              <div className="landing-preview-node"><AppWindow size={20} /><strong>Your app</strong><span>Owns the experience</span></div>
+              <ArrowRight className="landing-preview-flow-arrow" size={16} />
+              <div className="landing-preview-node"><KeyRound size={20} /><strong>Managed API</strong><span>Authenticated calls</span></div>
+              <ArrowRight className="landing-preview-flow-arrow" size={16} />
+              <div className="landing-preview-node"><Bot size={20} /><strong>Hosted agent</strong><span>Runs the conversation</span></div>
             </div>
+            <div className="landing-preview-request">
+              <div><span>POST</span> /api/sessions/:id/messages</div>
+              <code>Authorization: Bearer YOUR_API_KEY</code>
+              <code>{'{ "content": "Help this user plan a trip" }'}</code>
+            </div>
+            <div className="landing-preview-result"><Radio size={14} /> Streamed reply <span>·</span> <Database size={14} /> Saved session</div>
           </div>
-          <div className="landing-preview-compose">Message your agent <ArrowRight size={14} /></div>
         </div>
       </div>
-      <div className="landing-preview-caption"><Check size={13} /> Sessions are saved so you can return later</div>
+      <div className="landing-preview-caption"><Check size={13} /> Configure in the console · Connect from your server</div>
     </div>
   )
 }
 
 export default function LandingPage() {
   const { session } = useAuth()
-  const destination = session ? '/chat' : '/login'
+  const destination = '/agents'
 
   return (
     <div className="landing-page">
@@ -79,10 +82,10 @@ export default function LandingPage() {
         </Link>
         <nav aria-label="Main navigation" className="landing-nav">
           <a href="#how-it-works">How it works</a>
-          <a href="#features">Features</a>
-          <a href="https://duke-ece.github.io/managed-agents-docs/">Docs</a>
+          <a href="#features">Capabilities</a>
+          <Link to="/keys?tab=docs">API guide</Link>
         </nav>
-        <Link className="landing-login" to={destination}>
+        <Link className="landing-login" to={session ? destination : '/login'}>
           {session ? 'Open console' : 'Log in'} <ArrowRight size={15} />
         </Link>
       </header>
@@ -90,14 +93,14 @@ export default function LandingPage() {
       <main>
         <section className="landing-hero">
           <div className="landing-hero-copy">
-            <div className="landing-eyebrow"><span /> A place for your agents and their conversations</div>
-            <h1>Build the agent.<br /><span>Keep the context.</span></h1>
-            <p>Configure an agent, work with it in real time, and return to the conversation whenever you need it. One console for the chat and the controls behind it.</p>
+            <div className="landing-eyebrow"><span /> AGENT HOSTING FOR APPLICATIONS</div>
+            <h1>Hosted agents<br /><span>for your apps.</span></h1>
+            <p>Managed Agents gives other applications a place to run agents. Configure them in one console, connect from your server with an API key, and keep conversations available across sessions.</p>
             <div className="landing-actions">
               <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
-              <a className="landing-secondary" href="#how-it-works">See how it works <ArrowRight size={15} /></a>
+              <Link className="landing-secondary" to="/keys?tab=docs">Explore the API <ArrowRight size={15} /></Link>
             </div>
-            <div className="landing-hero-foot"><ShieldCheck size={15} /> Your sessions stay connected to your account</div>
+            <div className="landing-hero-foot"><ShieldCheck size={15} /> Keep API keys on your server, away from browser code</div>
           </div>
           <div className="landing-hero-visual"><ProductPreview /></div>
         </section>
@@ -105,19 +108,19 @@ export default function LandingPage() {
         <section className="landing-flow" id="how-it-works" aria-labelledby="landing-flow-title">
           <div className="landing-section-heading">
             <span className="landing-section-kicker">HOW IT WORKS</span>
-            <h2 id="landing-flow-title">From a first prompt to a lasting workspace.</h2>
+            <h2 id="landing-flow-title">Connect your application to an agent.</h2>
           </div>
           <div className="landing-flow-grid">
-            <div><span>01 / CONFIGURE</span><h3>Choose an agent</h3><p>Start with a shared template or create one with the instructions and model you need.</p></div>
-            <div><span>02 / CONVERSE</span><h3>Work in real time</h3><p>Responses stream into the chat while the conversation remains easy to follow.</p></div>
-            <div><span>03 / CONTINUE</span><h3>Come back later</h3><p>Find the session in your history and continue with its saved context.</p></div>
+            <div><span>01 / CONFIGURE</span><h3>Define the agent</h3><p>Set its instructions and model in the console, then use its agent ID in your app.</p></div>
+            <div><span>02 / CONNECT</span><h3>Call the API</h3><p>Create an API key for your server. Start a session and send messages through authenticated endpoints.</p></div>
+            <div><span>03 / RESPOND</span><h3>Stream and resume</h3><p>Display replies as they arrive and use the saved session ID to continue later.</p></div>
           </div>
         </section>
 
         <section className="landing-features" id="features" aria-labelledby="landing-features-title">
           <div className="landing-section-heading">
             <span className="landing-section-kicker">THE PLATFORM</span>
-            <h2 id="landing-features-title">The useful parts of an agent, together.</h2>
+            <h2 id="landing-features-title">Agent infrastructure your app can use.</h2>
           </div>
           <div className="landing-feature-grid">
             {features.map(({ number, icon: Icon, title, description }) => (
@@ -132,12 +135,12 @@ export default function LandingPage() {
 
         <section className="landing-end">
           <span className="landing-section-kicker">READY WHEN YOU ARE</span>
-          <h2>Pick up where you left off.</h2>
-          <Link className="landing-primary" to={destination}>Go to Managed Agents <ArrowRight size={17} /></Link>
+          <h2>Give your application an agent.</h2>
+          <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
         </section>
       </main>
 
-      <footer className="landing-footer"><span>Managed Agents · Duke ECE</span><a href="https://duke-ece.github.io/managed-agents-docs/">Documentation <ArrowRight size={13} /></a></footer>
+      <footer className="landing-footer"><span>Managed Agents · Duke ECE</span><Link to="/keys?tab=docs">API guide <ArrowRight size={13} /></Link></footer>
     </div>
   )
 }
