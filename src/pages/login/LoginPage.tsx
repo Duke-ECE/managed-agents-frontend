@@ -61,7 +61,7 @@ export default function LoginPage() {
               <BrandMark />
             </div>
             <p className="mt-5 text-center text-[13px] leading-relaxed text-ink-400">
-              {localPreviewEnabled ? 'Explore the interface with local sample data.' : 'Sign in to chat with your managed agents.'}
+              {localPreviewEnabled ? 'Explore the interface with local sample data.' : 'Sign in to configure agents and connect your applications.'}
             </p>
 
             {localPreviewEnabled ? (
