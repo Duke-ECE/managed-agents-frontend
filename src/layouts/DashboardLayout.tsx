@@ -1,13 +1,13 @@
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  MessagesSquare, MessageSquare, Terminal, Sun, Moon, Loader2,
+  MessagesSquare, MessageSquare, Sun, Moon, Loader2,
   PanelLeftOpen, PanelLeftClose, LogOut, ShieldCheck, Bot,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '../utils/format'
 import { useTheme } from '../hooks/useTheme'
-import { useAuth } from '../components/AuthProvider'
+import { BrandMark, useAuth } from '../components/AuthProvider'
 import { signOut } from '../lib/auth'
 import { fetchMe } from '../lib/chat-api'
 import { localPreviewEnabled } from '../lib/local-preview'
@@ -56,14 +56,8 @@ function Sidebar({ open, isAdmin, onNavigate }: { open: boolean; isAdmin: boolea
       )}
     >
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2.5 px-5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[#7c3aed] shadow-lg shadow-accent/25">
-          <Terminal className="h-4 w-4 text-white" strokeWidth={2.5} />
-        </div>
-        <div className="leading-tight">
-          <div className="font-display text-[15px] font-semibold tracking-tight text-ink-50">AgentDeck</div>
-          <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-400">Managed Agents</div>
-        </div>
+      <div className="flex h-16 items-center px-5">
+        <BrandMark />
       </div>
 
       {/* Nav */}
