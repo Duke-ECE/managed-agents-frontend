@@ -159,14 +159,14 @@ export interface PlatformAPIKey {
 }
 
 export async function listAPIKeys(): Promise<PlatformAPIKey[]> {
-  const res = await fetch(`${API_BASE}/api/keys`, { headers: await authHeaders() })
+  const res = await apiFetch(`${API_BASE}/api/keys`, { headers: await authHeaders() })
   await throwIfNotOk(res)
   const data = await res.json() as { keys: PlatformAPIKey[] }
   return data.keys
 }
 
 export async function createAPIKey(name: string): Promise<{ key: PlatformAPIKey; secret: string }> {
-  const res = await fetch(`${API_BASE}/api/keys`, {
+  const res = await apiFetch(`${API_BASE}/api/keys`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ name }),
@@ -176,7 +176,7 @@ export async function createAPIKey(name: string): Promise<{ key: PlatformAPIKey;
 }
 
 export async function revokeAPIKey(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/keys/${encodeURIComponent(id)}`, {
+  const res = await apiFetch(`${API_BASE}/api/keys/${encodeURIComponent(id)}`, {
     method: 'DELETE', headers: await authHeaders(),
   })
   await throwIfNotOk(res)

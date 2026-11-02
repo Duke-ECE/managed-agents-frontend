@@ -13,7 +13,6 @@ const createSessionExample = `curl -sS -X POST "${baseUrl}/api/sessions" \\
 const chatExample = `curl -N -X POST "${baseUrl}/api/sessions/$SESSION_ID/messages" \\
   -H "Authorization: Bearer $MANAGED_AGENTS_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -H "X-Client-Request-Id: req-example-001" \\
   -d '{"content":"Hello"}'`
 
 const transcriptExample = `curl -sS "${baseUrl}/api/sessions/$SESSION_ID/messages?limit=50" \\
@@ -47,7 +46,6 @@ const sessionRoutes = [
   ['GET', '/api/sessions/:id/messages', 'Read the transcript'],
   ['GET', '/api/sessions', 'List your sessions'],
   ['PATCH', '/api/sessions/:id/title', 'Rename a session'],
-  ['POST', '/api/sessions/:id/cancel', 'Request cancellation of a turn'],
   ['DELETE', '/api/sessions/:id', 'End a session'],
 ] as const
 
@@ -64,7 +62,7 @@ export default function APIDocsTab() {
         <code className="mt-1 block break-all text-[13px] text-ink-100">{baseUrl}</code>
       </div>
       <p className="mt-3 text-[12px] leading-relaxed text-ink-400">
-        API key authentication is part of the upcoming backend rollout. Local preview keys are sample data and cannot call this address.
+        Local preview keys are sample data and cannot call this address. Use a real key created in the deployed console for server-side calls.
       </p>
     </Card>
 
@@ -76,7 +74,7 @@ export default function APIDocsTab() {
       <CodeBlock label="POST /api/sessions" code={createSessionExample} />
       <div>
         <h2 className="font-display text-[16px] font-semibold text-ink-50">2. Stream a reply</h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-ink-400">Set <code>SESSION_ID</code> to the returned ID. The response is Server-Sent Events: read <code>text_delta</code> frames until <code>done</code>. For another turn, call the same path with a new request ID.</p>
+        <p className="mt-1 text-[13px] leading-relaxed text-ink-400">Set <code>SESSION_ID</code> to the returned ID. The response is Server-Sent Events: read <code>text_delta</code> frames until <code>done</code>. For another turn, call the same path again.</p>
       </div>
       <CodeBlock label="POST /api/sessions/:id/messages · SSE" code={chatExample} />
       <div>
@@ -98,7 +96,7 @@ export default function APIDocsTab() {
         Key management uses a different credential: <code>GET /api/keys</code>, <code>POST /api/keys</code>, and <code>DELETE /api/keys/:id</code> require your Supabase login JWT. An API key cannot create or revoke other keys.
       </p>
       <p className="mt-2 text-[12px] leading-relaxed text-ink-400">
-        If a stream disconnects before <code>done</code>, inspect the session and reuse the same <code>X-Client-Request-Id</code> with the same message. Stopping the HTTP stream alone does not guarantee cancellation.
+        If a stream disconnects before <code>done</code>, read the transcript before resending. The current chat API does not deduplicate retries, and stopping the HTTP stream does not guarantee cancellation.
       </p>
     </Card>
   </div>
