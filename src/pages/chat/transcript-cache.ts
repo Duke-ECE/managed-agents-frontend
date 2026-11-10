@@ -11,7 +11,9 @@
  * serializable when storage is enabled). Callers render the cached value
  * immediately and revalidate in the background, then `set` the fresh value.
  */
-export const TRANSCRIPT_STORAGE_PREFIX = 'ma.transcript.'
+// v2 stores tool events as separate timeline entries. Do not hydrate older
+// cached assistant bubbles whose embedded tool events would now be hidden.
+export const TRANSCRIPT_STORAGE_PREFIX = 'ma.transcript.v2.'
 
 function storage(): Storage | null {
   try {
@@ -29,7 +31,7 @@ export function clearTranscriptStorage(): void {
     const doomed: string[] = []
     for (let i = 0; i < store.length; i++) {
       const key = store.key(i)
-      if (key?.startsWith(TRANSCRIPT_STORAGE_PREFIX)) doomed.push(key)
+      if (key?.startsWith('ma.transcript.')) doomed.push(key)
     }
     for (const key of doomed) store.removeItem(key)
   } catch {
