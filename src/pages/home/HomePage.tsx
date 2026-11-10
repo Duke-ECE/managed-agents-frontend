@@ -7,7 +7,7 @@ import { useAsync } from '../../hooks/useAsync'
 import { listAgents, listSessions } from '../../lib/chat-api'
 import { timeAgo } from '../../utils/format'
 
-/** The signed-in overview mirrors the mobile Home tab. */
+/** The signed-in overview mirrors the mobile Overview tab. */
 export default function HomePage() {
   const { session } = useAuth()
   const { data, loading, error, reload } = useAsync(async () => {

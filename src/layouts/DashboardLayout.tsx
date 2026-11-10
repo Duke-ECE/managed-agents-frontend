@@ -22,7 +22,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/console', label: 'Home', icon: House },
+  { to: '/console', label: 'Overview', icon: House },
   { to: '/chat', label: 'Chat', icon: MessageSquare },
   { to: '/sessions', label: 'Sessions', icon: MessagesSquare },
   { to: '/agents', label: 'Agents', icon: Bot },
@@ -30,7 +30,7 @@ const navItems: NavItem[] = [
 ]
 
 const breadcrumbMap: Record<string, string> = {
-  console: 'Home',
+  console: 'Overview',
   chat: 'Chat',
   sessions: 'Sessions',
   admin: 'LLM Access',
