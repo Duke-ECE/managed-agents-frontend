@@ -28,10 +28,10 @@ const features = [
 
 function ProductPreview() {
   return (
-    <div className="landing-preview" role="img" aria-label="Illustration of an application connecting to a hosted agent through the Managed Agents API">
+    <div className="landing-preview" role="img" aria-label="Illustration of an application connecting to a hosted agent through the PolyAgent API">
       <div className="landing-preview-bar">
         <span className="landing-preview-dots" aria-hidden="true"><i /><i /><i /></span>
-        <span>Managed Agents / Integration</span>
+        <span>PolyAgent / Integration</span>
         <span className="landing-preview-live"><span /> Connected</span>
       </div>
       <div className="landing-preview-body">
@@ -78,9 +78,9 @@ export default function LandingPage() {
   return (
     <div className="landing-page">
       <header className="landing-header">
-        <Link className="landing-brand" to="/" aria-label="Managed Agents home">
+        <Link className="landing-brand" to="/" aria-label="PolyAgent home">
           <img src="/favicon.svg" alt="" />
-          <span>Managed Agents</span>
+          <span>PolyAgent</span>
         </Link>
         <nav aria-label="Main navigation" className="landing-nav">
           <a href="#how-it-works">How it works</a>
@@ -97,7 +97,7 @@ export default function LandingPage() {
           <div className="landing-hero-copy">
             <div className="landing-eyebrow"><span /> AGENT HOSTING FOR APPLICATIONS</div>
             <h1>Hosted agents<br /><span>for your apps.</span></h1>
-            <p>Managed Agents gives other applications a place to run agents. Configure them in one console, connect from your server with an API key, and keep conversations available across sessions.</p>
+            <p>PolyAgent gives other applications a place to run agents. Configure them in one console, connect from your server with an API key, and keep conversations available across sessions.</p>
             <div className="landing-actions">
               <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
               <a className="landing-secondary" href={API_GUIDE_URL}>Explore the API <ArrowRight size={15} /></a>
@@ -142,7 +142,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="landing-footer"><span>Managed Agents · Duke ECE</span><a href={DOCS_URL}>Docs <ArrowRight size={13} /></a></footer>
+      <footer className="landing-footer"><span>PolyAgent</span><a href={DOCS_URL}>Docs <ArrowRight size={13} /></a></footer>
     </div>
   )
 }
