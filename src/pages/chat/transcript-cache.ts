@@ -11,9 +11,9 @@
  * serializable when storage is enabled). Callers render the cached value
  * immediately and revalidate in the background, then `set` the fresh value.
  */
-// v2 stores tool events as separate timeline entries. Do not hydrate older
-// cached assistant bubbles whose embedded tool events would now be hidden.
-export const TRANSCRIPT_STORAGE_PREFIX = 'ma.transcript.v2.'
+// v3 renders tools before the completed assistant reply. Old cached message
+// arrays preserve the earlier order, so rehydrate from the transcript.
+export const TRANSCRIPT_STORAGE_PREFIX = 'ma.transcript.v3.'
 
 function storage(): Storage | null {
   try {

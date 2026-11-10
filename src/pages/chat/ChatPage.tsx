@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  AlertTriangle, Bot, CircleCheck, CircleX, Loader2, MessageSquare,
-  PanelLeftOpen, SendHorizontal, Square, Wrench,
+  AlertTriangle, Bot, ChevronDown, CircleCheck, CircleX, Loader2, MessageSquare,
+  PanelLeftOpen, SendHorizontal, Square,
 } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { NativeSelect } from '../../components/ui/native-select'
@@ -79,23 +79,29 @@ function toolName(item: ToolEventItem): string | undefined {
   return typeof data?.tool === 'string' ? data.tool : undefined
 }
 
-function appendToolEvent(messages: ChatMessage[], item: ToolEventItem, nextId: () => number, seq?: number): ChatMessage[] {
-  const last = messages.at(-1)
+function appendToolEvent(messages: ChatMessage[], item: ToolEventItem, nextId: () => number, seq?: number, beforeId?: number): ChatMessage[] {
+  const insertAt = beforeId == null ? messages.length : messages.findIndex((msg) => msg.id === beforeId)
+  const index = insertAt < 0 ? messages.length : insertAt
+  const last = messages[index - 1]
   if (item.kind === 'tool_result' && last?.role === 'tool' && last.tools.length === 1 &&
       last.tools[0].kind === 'tool_call' && toolName(last.tools[0]) === toolName(item)) {
-    return [...messages.slice(0, -1), { ...last, tools: [...last.tools, item], done: true }]
+    return [...messages.slice(0, index - 1), { ...last, tools: [...last.tools, item], done: true }, ...messages.slice(index)]
   }
-  return [...messages, {
+  return [...messages.slice(0, index), {
     id: nextId(), seq, role: 'tool', text: '', tools: [item],
     done: item.kind === 'tool_result', error: null, usage: null, partial: false,
-  }]
+  }, ...messages.slice(index)]
 }
 
-/** Preserve tool events as transcript entries. The runtime persists assistant
- * text before tool turns, and the latest-window boundary can split a pair.
- * Neither case requires a following assistant message to display results. */
+/** Runtime storage writes assistant text before its tool events. Render the
+ * completed answer after those events, within each user turn. */
 function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number): ChatMessage[] {
   let msgs: ChatMessage[] = []
+  let pendingAssistant: ChatMessage[] = []
+  const flushAssistant = () => {
+    msgs.push(...pendingAssistant)
+    pendingAssistant = []
+  }
   for (const turn of turns) {
     if (turn.role === 'tool_call' || turn.role === 'tool_result') {
       let data: unknown = turn.content_json
@@ -104,6 +110,7 @@ function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number):
       continue
     }
     if (turn.role === 'system') {
+      flushAssistant()
       msgs.push({
         id: nextId(),
         seq: turn.seq,
@@ -121,7 +128,8 @@ function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number):
     // triple), not chat content — skip them like any other non-chat role.
     if (turn.role === 'config') continue
     if (turn.role !== 'user' && turn.role !== 'assistant') continue
-    msgs.push({
+    if (turn.role === 'user') flushAssistant()
+    const message: ChatMessage = {
       id: nextId(),
       seq: turn.seq,
       role: turn.role,
@@ -131,8 +139,11 @@ function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number):
       error: null,
       usage: turn.role === 'assistant' ? turnUsage(turn.content_json) : null,
       partial: false,
-    })
+    }
+    if (turn.role === 'assistant') pendingAssistant.push(message)
+    else msgs.push(message)
   }
+  flushAssistant()
   return msgs
 }
 
@@ -155,30 +166,29 @@ function ToolActivity({ msg }: { msg: ChatMessage }) {
   const call = msg.tools.find((item) => item.kind === 'tool_call')
   const result = msg.tools.find((item) => item.kind === 'tool_result')
   const payload = result?.data as ToolResultPayload | undefined
-  const name = toolName(call ?? result!) ?? 'tool'
+  const tool = toolName(call ?? result!) ?? 'tool'
+  const name = tool === 'bash' ? 'shell' : tool
+  const command = toolArguments(call)
   const failed = payload?.ok === false
   const detail = result
     ? String(failed ? payload?.error ?? 'Tool failed' : payload?.output ?? '')
     : msg.done ? 'No saved result' : 'Running…'
   return (
-    <details className="group max-w-[720px] rounded-xl border border-ink-700/80 bg-ink-850/60 text-[12px]">
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-3 marker:hidden">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-ink-800 text-ink-300">
-          <Wrench className="h-3.5 w-3.5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-medium text-ink-100">{name}</span>
-          {call && <span className="block truncate font-mono text-[11px] text-ink-400" title={toolArguments(call)}>{toolArguments(call)}</span>}
-          {result && <span className="block truncate font-mono text-[11px] text-ink-400">{detail.split('\n')[0] || '(no output)'}</span>}
-          {msg.partial && <span className="block text-[10px] text-warn">partial — not saved</span>}
-        </span>
-        {result ? failed
+    <details className="group max-w-[720px] text-[12px]">
+      <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-md px-2 py-1 text-ink-400 hover:bg-ink-850 marker:hidden">
+        <span className="shrink-0 font-medium text-ink-300">{name}</span>
+        <span className="shrink-0 text-ink-600">›</span>
+        <span className="min-w-0 flex-1 truncate font-mono" title={command}>{command || (call ? '(no arguments)' : 'result')}</span>
+        {msg.partial ? <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warn" aria-label="Partial result" /> : result ? failed
           ? <CircleX className="h-4 w-4 shrink-0 text-bad" aria-label="Failed" />
           : <CircleCheck className="h-4 w-4 shrink-0 text-good" aria-label="Succeeded" />
           : <Loader2 className={cn('h-4 w-4 shrink-0 text-ink-400', !msg.done && 'animate-spin')} aria-label={msg.done ? 'Result unavailable' : 'Running'} />}
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
       </summary>
-      <div className="border-t border-ink-700/70 px-3.5 py-3">
-        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-ink-200">{detail}</pre>
+      <div className="mt-1 rounded-lg border border-ink-700 bg-ink-850/60 px-3 py-2">
+        {command && <pre className="mb-2 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-ink-300">{command}</pre>}
+        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-ink-200">{detail || '(no output)'}</pre>
+        {msg.partial && <p className="mt-2 text-[11px] text-warn">partial — not saved</p>}
       </div>
     </details>
   )
@@ -290,6 +300,7 @@ export default function ChatPage() {
   // (including tool turns folded into bubbles) and the smallest one, which
   // becomes before_seq when paging backwards.
   const loadedSeqsRef = useRef<Set<number>>(new Set())
+  const loadedTurnsRef = useRef<TranscriptMessage[]>([])
   const oldestSeqRef = useRef<number | null>(null)
   // Per-session "older messages exist" — survives cache-hit revisits where
   // the revalidating fetch is discarded because local state moved ahead.
@@ -413,6 +424,7 @@ export default function ChatPage() {
     setHistoryError(null)
     sessionGoneRef.current = false
     loadedSeqsRef.current = new Set()
+    loadedTurnsRef.current = []
     oldestSeqRef.current = null
     if (!routeId) {
       setMessages([])
@@ -444,6 +456,7 @@ export default function ChatPage() {
         setMessages(fresh)
         cache.set(routeId, fresh)
         loadedSeqsRef.current = new Set(turns.map((t) => t.seq))
+        loadedTurnsRef.current = turns
         oldestSeqRef.current = turns.length > 0 ? turns[0].seq : null
         historyHasMoreRef.current[routeId] = page.has_more
         setHasMoreHistory(page.has_more)
@@ -548,8 +561,9 @@ export default function ChatPage() {
         for (const t of page.messages) loadedSeqsRef.current.add(t.seq)
         if (older.length > 0) {
           oldestSeqRef.current = older[0].seq // turns arrive ascending by seq
-          const olderMsgs = transcriptToMessages(older, () => nextMsgId.current++)
-          const merged = [...olderMsgs, ...messagesRef.current]
+          loadedTurnsRef.current = [...older, ...loadedTurnsRef.current]
+          const live = messagesRef.current.filter((msg) => msg.seq == null)
+          const merged = [...transcriptToMessages(loadedTurnsRef.current, () => nextMsgId.current++), ...live]
           skipScrollRef.current = true // prepending must not scroll to bottom
           setMessages(merged)
           cacheRef.current.set(routeId, merged)
@@ -657,6 +671,7 @@ export default function ChatPage() {
               case 'tool_result':
                 setMessages((msgs) => appendToolEvent(
                   msgs, { kind: event as ToolEventItem['kind'], data }, () => nextMsgId.current++,
+                  undefined, assistantMsg.id,
                 ))
                 break
               case 'error': {
@@ -877,7 +892,7 @@ export default function ChatPage() {
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-ink-900">
           {/* Messages */}
-          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-6 md:px-8">
+          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-6 md:px-8 [&>details+details]:!mt-1">
             {hasMoreHistory && !historyLoading && (
               <div className="flex justify-center">
                 <button
