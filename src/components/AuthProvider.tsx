@@ -101,7 +101,7 @@ export function BrandMark({ compactOnDesktop = false }: { compactOnDesktop?: boo
     <div className="flex items-center gap-2.5">
       <img src="/favicon.svg" alt="" className="h-8 w-8 shrink-0 rounded-lg" />
       <div className={compactOnDesktop ? 'leading-tight md:hidden' : 'leading-tight'}>
-        <div className="font-display text-[15px] font-semibold tracking-tight text-ink-50">Managed Agents</div>
+        <div className="font-display text-[15px] font-semibold tracking-tight text-ink-50">PolyAgent</div>
         <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-400">Console</div>
       </div>
     </div>

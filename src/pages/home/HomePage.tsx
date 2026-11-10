@@ -22,7 +22,7 @@ export default function HomePage() {
   const active = data?.page.sessions.filter(item => item.status === 'active').length ?? 0
 
   return <div className="mx-auto max-w-[1100px] space-y-6">
-    <PageHeader title={name ? `Welcome, ${name}` : 'Welcome to Managed Agents'} description="Your agents and conversations in one place." />
+    <PageHeader title={name ? `Welcome, ${name}` : 'Welcome to PolyAgent'} description="Your agents and conversations in one place." />
 
     <div className="relative overflow-hidden rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/15 via-ink-900 to-ink-900 p-6 sm:p-8">
       <div className="relative z-10 max-w-xl">

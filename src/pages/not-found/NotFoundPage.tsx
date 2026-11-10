@@ -5,9 +5,9 @@ import { DOCS_URL } from '../../lib/navigation'
 export default function NotFoundPage() {
   return <main className="app-canvas flex min-h-screen items-center justify-center p-6">
     <div className="w-full max-w-md rounded-2xl border border-ink-700 bg-ink-900 p-8 text-center shadow-card">
-      <Link to="/" aria-label="Managed Agents home" className="inline-flex items-center gap-2.5 text-ink-50 hover:opacity-80">
+      <Link to="/" aria-label="PolyAgent home" className="inline-flex items-center gap-2.5 text-ink-50 hover:opacity-80">
         <img src="/favicon.svg" alt="" className="h-8 w-8 rounded-lg" />
-        <span className="font-display text-[15px] font-semibold">Managed Agents</span>
+        <span className="font-display text-[15px] font-semibold">PolyAgent</span>
       </Link>
       <p className="mt-8 font-mono text-[12px] tracking-widest text-accent">404</p>
       <h1 className="mt-2 font-display text-[26px] font-semibold text-ink-50">Page not found</h1>
