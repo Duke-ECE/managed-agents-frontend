@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle, Bot, CircleCheck, CircleX, Loader2, MessageSquare,
-  PanelLeftOpen, SendHorizontal, Square, User, Wrench,
+  PanelLeftOpen, SendHorizontal, Square, Wrench,
 } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { NativeSelect } from '../../components/ui/native-select'
-import { Card, PageHeader } from '../../components/Primitives'
+import { PageHeader } from '../../components/Primitives'
 import { cn } from '../../utils/format'
 import ChatSidebar from './ChatSidebar'
 import Markdown from './Markdown'
@@ -48,7 +48,7 @@ interface ChatMessage {
   id: number
   /** durable transcript seq; undefined for live, not-yet-saved turns */
   seq?: number
-  role: 'user' | 'assistant' | 'system'
+  role: 'user' | 'assistant' | 'system' | 'tool'
   text: string
   tools: ToolEventItem[]
   done: boolean
@@ -74,22 +74,33 @@ function turnText(contentJson: string): string {
   return contentJson
 }
 
-/**
- * Map a durable transcript to chat bubbles. tool_call/tool_result turns are
- * folded into the next assistant message, matching how live streams render.
- * system turns (the session's system prompt, recorded by the runtime) become
- * centered notices; they never absorb pending tool turns. config turns
- * (session metadata: the redacted LLM base_url/model triple) are not chat
- * content and are skipped like any other non-chat role.
- */
+function toolName(item: ToolEventItem): string | undefined {
+  const data = item.data as { tool?: unknown } | null
+  return typeof data?.tool === 'string' ? data.tool : undefined
+}
+
+function appendToolEvent(messages: ChatMessage[], item: ToolEventItem, nextId: () => number, seq?: number): ChatMessage[] {
+  const last = messages.at(-1)
+  if (item.kind === 'tool_result' && last?.role === 'tool' && last.tools.length === 1 &&
+      last.tools[0].kind === 'tool_call' && toolName(last.tools[0]) === toolName(item)) {
+    return [...messages.slice(0, -1), { ...last, tools: [...last.tools, item], done: true }]
+  }
+  return [...messages, {
+    id: nextId(), seq, role: 'tool', text: '', tools: [item],
+    done: item.kind === 'tool_result', error: null, usage: null, partial: false,
+  }]
+}
+
+/** Preserve tool events as transcript entries. The runtime persists assistant
+ * text before tool turns, and the latest-window boundary can split a pair.
+ * Neither case requires a following assistant message to display results. */
 function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number): ChatMessage[] {
-  const msgs: ChatMessage[] = []
-  let pendingTools: ToolEventItem[] = []
+  let msgs: ChatMessage[] = []
   for (const turn of turns) {
     if (turn.role === 'tool_call' || turn.role === 'tool_result') {
       let data: unknown = turn.content_json
       try { data = JSON.parse(turn.content_json) } catch { /* keep the raw string */ }
-      pendingTools.push({ kind: turn.role, data })
+      msgs = appendToolEvent(msgs, { kind: turn.role, data }, nextId, turn.seq)
       continue
     }
     if (turn.role === 'system') {
@@ -115,47 +126,66 @@ function transcriptToMessages(turns: TranscriptMessage[], nextId: () => number):
       seq: turn.seq,
       role: turn.role,
       text: turnText(turn.content_json),
-      tools: turn.role === 'assistant' ? pendingTools : [],
+      tools: [],
       done: true,
       error: null,
       usage: turn.role === 'assistant' ? turnUsage(turn.content_json) : null,
       partial: false,
     })
-    if (turn.role === 'assistant') pendingTools = []
   }
   return msgs
 }
 
-/* ------------------------------ Message bubbles ------------------------------ */
+/* ------------------------------ Conversation entries ------------------------------ */
 
-function ToolLine({ item }: { item: ToolEventItem }) {
-  if (item.kind === 'tool_call') {
-    const d = (item.data ?? {}) as ToolCallPayload
-    return (
-      <div className="flex items-center gap-1.5 font-mono text-[11px] text-ink-500" title={d.arguments_json}>
-        <Wrench className="h-3 w-3 shrink-0 text-cyn" />
-        <span className="shrink-0 text-ink-400">tool call</span>
-        <span className="truncate">{d.tool ?? '?'}{d.arguments_json ? `(${d.arguments_json})` : ''}</span>
-      </div>
-    )
+function toolArguments(item: ToolEventItem | undefined): string {
+  if (!item) return ''
+  const raw = (item.data as ToolCallPayload | null)?.arguments_json
+  if (!raw) return ''
+  try {
+    const args = JSON.parse(raw) as Record<string, unknown>
+    const value = args.command ?? args.path
+    return typeof value === 'string' ? value : raw
+  } catch {
+    return raw
   }
-  const d = (item.data ?? {}) as ToolResultPayload
-  const ok = d.ok !== false
-  const detail = ok
-    ? typeof d.output === 'string' ? d.output : JSON.stringify(d.output ?? '')
-    : d.error ?? 'failed'
+}
+
+function ToolActivity({ msg }: { msg: ChatMessage }) {
+  const call = msg.tools.find((item) => item.kind === 'tool_call')
+  const result = msg.tools.find((item) => item.kind === 'tool_result')
+  const payload = result?.data as ToolResultPayload | undefined
+  const name = toolName(call ?? result!) ?? 'tool'
+  const failed = payload?.ok === false
+  const detail = result
+    ? String(failed ? payload?.error ?? 'Tool failed' : payload?.output ?? '')
+    : msg.done ? 'No saved result' : 'Running…'
   return (
-    <div className="flex items-center gap-1.5 font-mono text-[11px] text-ink-500" title={detail}>
-      {ok
-        ? <CircleCheck className="h-3 w-3 shrink-0 text-good" />
-        : <CircleX className="h-3 w-3 shrink-0 text-bad" />}
-      <span className="shrink-0 text-ink-400">tool result</span>
-      <span className="truncate">{d.tool ?? '?'}: {detail}</span>
-    </div>
+    <details className="group max-w-[720px] rounded-xl border border-ink-700/80 bg-ink-850/60 text-[12px]">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-3 marker:hidden">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-ink-800 text-ink-300">
+          <Wrench className="h-3.5 w-3.5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium text-ink-100">{name}</span>
+          {call && <span className="block truncate font-mono text-[11px] text-ink-400" title={toolArguments(call)}>{toolArguments(call)}</span>}
+          {result && <span className="block truncate font-mono text-[11px] text-ink-400">{detail.split('\n')[0] || '(no output)'}</span>}
+          {msg.partial && <span className="block text-[10px] text-warn">partial — not saved</span>}
+        </span>
+        {result ? failed
+          ? <CircleX className="h-4 w-4 shrink-0 text-bad" aria-label="Failed" />
+          : <CircleCheck className="h-4 w-4 shrink-0 text-good" aria-label="Succeeded" />
+          : <Loader2 className={cn('h-4 w-4 shrink-0 text-ink-400', !msg.done && 'animate-spin')} aria-label={msg.done ? 'Result unavailable' : 'Running'} />}
+      </summary>
+      <div className="border-t border-ink-700/70 px-3.5 py-3">
+        <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-ink-200">{detail}</pre>
+      </div>
+    </details>
   )
 }
 
 function MessageBubble({ msg }: { msg: ChatMessage }) {
+  if (msg.role === 'tool') return <ToolActivity msg={msg} />
   if (msg.role === 'system') {
     // System-prompt record: a centered muted notice, not a chat bubble. Long
     // prompts truncate to one line; the full text is in the tooltip.
@@ -173,28 +203,19 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 
   if (msg.role === 'user') {
     return (
-      <div className="flex justify-end gap-3">
-        <div className="max-w-[80%] rounded-xl border border-accent/25 bg-accent/15 px-4 py-3">
+      <div className="flex justify-end">
+        <div className="max-w-[82%] rounded-2xl bg-accent/15 px-4 py-3">
           <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-100">{msg.text}</p>
         </div>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-info-line bg-info-soft text-info">
-          <User className="h-4 w-4" />
-        </span>
       </div>
     )
   }
 
+  if (!msg.text && msg.done && !msg.error && !msg.partial && !msg.usage) return null
+
   return (
-    <div className="flex gap-3">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-vio-line bg-vio-soft text-vio">
-        <Bot className="h-4 w-4" />
-      </span>
-      <div className="max-w-[80%] rounded-xl border border-ink-700 bg-ink-850 px-4 py-3">
-        {msg.tools.length > 0 && (
-          <div className={cn('space-y-1', (msg.text || msg.error) && 'mb-2')}>
-            {msg.tools.map((tool, i) => <ToolLine key={i} item={tool} />)}
-          </div>
-        )}
+    <div className="max-w-[720px] py-1">
+      <div className="text-ink-100">
         {msg.text && <Markdown text={msg.text} />}
         {!msg.text && !msg.done && !msg.error && (
           <p className="flex items-center gap-2 text-[13px] text-ink-500">
@@ -587,6 +608,11 @@ export default function ChatPage() {
       setStreaming(true)
       const patch = (fn: (m: ChatMessage) => ChatMessage) =>
         setMessages((msgs) => msgs.map((m) => (m.id === assistantMsg.id ? fn(m) : m)))
+      const settleTools = (saved: boolean) => setMessages((msgs) => msgs.map((m) =>
+        m.role === 'tool' && m.id > assistantMsg.id && m.seq == null
+          ? { ...m, done: true, partial: !saved }
+          : m,
+      ))
 
       try {
         let sid = routeId
@@ -611,6 +637,7 @@ export default function ChatPage() {
 
         const controller = new AbortController()
         abortRef.current = controller
+        let completed = false
         await streamSessionMessage(sid, text, {
           signal: controller.signal,
           onEvent: (event, data) => {
@@ -628,10 +655,9 @@ export default function ChatPage() {
               }
               case 'tool_call':
               case 'tool_result':
-                patch((m) => ({
-                  ...m,
-                  tools: [...m.tools, { kind: event as ToolEventItem['kind'], data }],
-                }))
+                setMessages((msgs) => appendToolEvent(
+                  msgs, { kind: event as ToolEventItem['kind'], data }, () => nextMsgId.current++,
+                ))
                 break
               case 'error': {
                 const message =
@@ -646,10 +672,13 @@ export default function ChatPage() {
                   done: true,
                   partial: m.text.length > 0 || m.tools.length > 0,
                 }))
+                settleTools(false)
                 break
               }
               case 'done':
+                completed = true
                 patch((m) => ({ ...m, done: true, usage: (data as DonePayload) ?? null }))
+                settleTools(true)
                 break
               default:
                 break
@@ -661,10 +690,12 @@ export default function ChatPage() {
         patch((m) =>
           m.done ? m : { ...m, done: true, partial: m.text.length > 0 || m.tools.length > 0 },
         )
+        if (!completed) settleTools(false)
       } catch (err) {
         if (isAbortError(err)) {
           // Stop button (or navigation): keep the partial text, flag it.
           patch((m) => ({ ...m, done: true, partial: m.text.length > 0 || m.tools.length > 0 }))
+          settleTools(false)
           return
         }
         if (err instanceof ApiError && err.status === 410) {
@@ -675,6 +706,7 @@ export default function ChatPage() {
             error: m.error ?? 'This session has ended on the server.',
             partial: m.text.length > 0 || m.tools.length > 0,
           }))
+          settleTools(false)
         } else {
           const message = err instanceof Error ? err.message : String(err)
           patch((m) => ({
@@ -683,6 +715,7 @@ export default function ChatPage() {
             error: m.error ?? message,
             partial: m.text.length > 0 || m.tools.length > 0,
           }))
+          settleTools(false)
         }
       } finally {
         setStreaming(false)
@@ -842,9 +875,9 @@ export default function ChatPage() {
           </div>
         )}
 
-        <Card className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-ink-900">
           {/* Messages */}
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-6 md:px-8">
             {hasMoreHistory && !historyLoading && (
               <div className="flex justify-center">
                 <button
@@ -884,7 +917,7 @@ export default function ChatPage() {
 
           {/* Composer */}
           <Composer ready={ready && !blocked} streaming={streaming} placeholder={placeholder} onSend={send} onStop={stop} />
-        </Card>
+        </div>
       </div>
     </div>
   )

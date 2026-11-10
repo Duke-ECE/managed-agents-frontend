@@ -94,7 +94,7 @@ type PreviewSession = {
 }
 
 const sessions: PreviewSession[] = [
-  { id: 'preview-session-1', user_id: 'local-preview-user', status: 'active', title: 'Plan a project update',
+  { id: 'preview-session-1', user_id: 'local-preview-user', status: 'active', title: 'Inspect workspace',
     llm_model: 'Platform default', agent_id: builtInId, created_at: ago(1), last_active: ago(0.1) },
   { id: 'preview-session-2', user_id: 'local-preview-user', status: 'active', title: 'Summarize meeting notes',
     llm_model: 'Platform default', agent_id: 'preview-agent-research', created_at: ago(3), last_active: ago(2) },
@@ -108,8 +108,10 @@ const message = (seq: number, role: string, content: string, date: string): Prev
 })
 const transcripts: Record<string, PreviewMessage[]> = {
   'preview-session-1': [
-    message(1, 'user', 'Help me plan a short project update.', ago(0.1)),
-    message(2, 'assistant', 'Here is a simple structure:\n\n1. **Progress** — what shipped.\n2. **Next** — the work in motion.\n3. **Risks** — decisions or help needed.', ago(0.1)),
+    message(1, 'user', 'Run pwd in the workspace.', ago(0.1)),
+    message(2, 'assistant', 'I checked the working directory.', ago(0.1)),
+    { seq: 3, role: 'tool_call', content_json: JSON.stringify({ tool: 'bash', arguments_json: '{"command":"pwd"}' }), created_at: ago(0.1) },
+    { seq: 4, role: 'tool_result', content_json: JSON.stringify({ tool: 'bash', ok: true, output: '/workspace\n', error: '' }), created_at: ago(0.1) },
   ],
   'preview-session-2': [
     message(1, 'user', 'Summarize our meeting notes.', ago(2)),
