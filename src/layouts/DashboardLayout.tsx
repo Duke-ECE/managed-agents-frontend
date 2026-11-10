@@ -128,7 +128,7 @@ function Sidebar({ open, isAdmin, width, resizing, onWidthChange, onResizeStateC
       id="app-sidebar"
     >
       {/* Logo */}
-      <Link to="/console" aria-label="PolyAgent home" className={cn('flex h-16 items-center rounded-lg px-3 transition-opacity hover:opacity-75', compact && 'md:justify-center md:px-0')}>
+      <Link to="/" aria-label="PolyAgent introduction" className={cn('flex h-16 items-center rounded-lg px-3 transition-opacity hover:opacity-75', compact && 'md:justify-center md:px-0')}>
         <BrandMark compactOnDesktop={compact} />
       </Link>
 
