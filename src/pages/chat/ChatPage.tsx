@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle, Bot, ChevronDown, CircleCheck, CircleX, Loader2, MessageSquare,
-  PanelLeftOpen, SendHorizontal, Square,
+  PanelLeftOpen, SendHorizontal, Square, SquareTerminal,
 } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { NativeSelect } from '../../components/ui/native-select'
@@ -176,6 +176,7 @@ function ToolActivity({ msg }: { msg: ChatMessage }) {
   return (
     <details className="group max-w-[720px] text-[12px]">
       <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-md px-2 py-1 text-ink-400 hover:bg-ink-850 marker:hidden">
+        <SquareTerminal className="h-4 w-4 shrink-0 text-ink-500" aria-hidden="true" />
         <span className="shrink-0 font-medium text-ink-300">{name}</span>
         <span className="shrink-0 text-ink-600">›</span>
         <span className="min-w-0 flex-1 truncate font-mono" title={command}>{command || (call ? '(no arguments)' : 'result')}</span>
@@ -754,6 +755,15 @@ export default function ChatPage() {
           ? 'Message… (Enter to send, Shift+Enter for newline)'
           : 'Select an agent above to start chatting'
 
+  // Keep consecutive tool calls together while preserving the normal space
+  // around user messages and the final assistant reply.
+  const messageGroups = messages.reduce<ChatMessage[][]>((groups, msg) => {
+    const previous = groups.at(-1)
+    if (msg.role === 'tool' && previous?.[0]?.role === 'tool') previous.push(msg)
+    else groups.push([msg])
+    return groups
+  }, [])
+
   return (
     <div className="relative flex h-full gap-6">
       {mobileSessionsOpen && (
@@ -892,7 +902,7 @@ export default function ChatPage() {
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-ink-900">
           {/* Messages */}
-          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-6 md:px-8 [&>details+details]:!mt-1">
+          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-6 md:px-8">
             {hasMoreHistory && !historyLoading && (
               <div className="flex justify-center">
                 <button
@@ -926,7 +936,11 @@ export default function ChatPage() {
                 </p>
               </div>
             )}
-            {messages.map((msg) => <MessageBubble key={msg.id} msg={msg} />)}
+            {messageGroups.map((group) => (
+              <div key={group[0].id} className={group[0].role === 'tool' ? 'space-y-1' : undefined}>
+                {group.map((msg) => <MessageBubble key={msg.id} msg={msg} />)}
+              </div>
+            ))}
             <div ref={bottomRef} />
           </div>
 
