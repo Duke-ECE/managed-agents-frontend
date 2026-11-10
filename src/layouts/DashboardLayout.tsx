@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
-  MessagesSquare, MessageSquare, Sun, Moon, Monitor, Loader2,
+  MessagesSquare, MessageSquare, House, Sun, Moon, Monitor, Loader2,
   PanelLeftOpen, PanelLeftClose, LogOut, ShieldCheck, Bot, KeyRound, BookOpen, ExternalLink,
   type LucideIcon,
 } from 'lucide-react'
@@ -22,6 +22,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { to: '/console', label: 'Home', icon: House },
   { to: '/chat', label: 'Chat', icon: MessageSquare },
   { to: '/sessions', label: 'Sessions', icon: MessagesSquare },
   { to: '/agents', label: 'Agents', icon: Bot },
@@ -29,6 +30,7 @@ const navItems: NavItem[] = [
 ]
 
 const breadcrumbMap: Record<string, string> = {
+  console: 'Home',
   chat: 'Chat',
   sessions: 'Sessions',
   admin: 'LLM Access',
@@ -126,7 +128,7 @@ function Sidebar({ open, isAdmin, width, resizing, onWidthChange, onResizeStateC
       id="app-sidebar"
     >
       {/* Logo */}
-      <Link to="/" aria-label="Managed Agents home" className={cn('flex h-16 items-center rounded-lg px-3 transition-opacity hover:opacity-75', compact && 'md:justify-center md:px-0')}>
+      <Link to="/console" aria-label="Managed Agents home" className={cn('flex h-16 items-center rounded-lg px-3 transition-opacity hover:opacity-75', compact && 'md:justify-center md:px-0')}>
         <BrandMark compactOnDesktop={compact} />
       </Link>
 

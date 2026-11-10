@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessagesSquare, MessageSquare, CircleStop } from 'lucide-react'
+import { MessagesSquare, MessageSquare, CircleStop, Search } from 'lucide-react'
 import { deleteSession, listSessions, type SessionRecord } from '../../lib/chat-api'
 import { useAsync } from '../../hooks/useAsync'
 import { useTableSort } from '../../hooks/useTableSort'
@@ -9,7 +9,8 @@ import StatusBadge from '../../components/StatusBadge'
 import { PageHeader, Card, EmptyState, TableSkeleton } from '../../components/Primitives'
 import { Button } from '../../components/ui/button'
 import { NativeSelect } from '../../components/ui/native-select'
-import { timeAgo, formatDateTime, cn } from '../../utils/format'
+import { Input } from '../../components/ui/input'
+import { timeAgo, cn } from '../../utils/format'
 
 const STATUS_FILTERS = ['all', 'active', 'ended'] as const
 
@@ -30,6 +31,8 @@ export default function SessionList() {
   const [sessions, setSessions] = useState<SessionRecord[] | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState(false)
+  const [query, setQuery] = useState('')
   const [endingId, setEndingId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('all')
   const [timeFilter, setTimeFilter] = useState<string>('all')
@@ -45,6 +48,7 @@ export default function SessionList() {
   // over the loaded rows.
   const loadMore = async () => {
     setLoadingMore(true)
+    setLoadMoreError(false)
     try {
       const page = await listSessions({ limit: PAGE_SIZE, offset: sessions?.length ?? 0 })
       setSessions((list) => {
@@ -53,11 +57,18 @@ export default function SessionList() {
       })
       setHasMore(page.has_more)
     } catch {
-      // Leave the list untouched; the button stays for a retry.
+      setLoadMoreError(true)
     } finally {
       setLoadingMore(false)
     }
   }
+
+  // Search covers older pages too. Load them lazily only after a search starts.
+  useEffect(() => {
+    if (!query.trim() || !sessions || !hasMore || loadingMore || loadMoreError) return
+    const timer = window.setTimeout(() => { void loadMore() }, 250)
+    return () => window.clearTimeout(timer)
+  }, [query, sessions?.length, hasMore, loadingMore, loadMoreError])
 
   const end = async (s: SessionRecord) => {
     setEndingId(s.id)
@@ -77,6 +88,8 @@ export default function SessionList() {
 
   const filtered = useMemo(() => {
     let list = sessions ?? []
+    const search = query.trim().toLowerCase()
+    if (search) list = list.filter(s => (s.title ?? '').toLowerCase().includes(search) || s.id.toLowerCase().includes(search))
     if (statusFilter !== 'all') list = list.filter(s => s.status === statusFilter)
     const range = TIME_RANGES.find(r => r.key === timeFilter)
     if (range && range.ms !== Infinity) {
@@ -84,7 +97,7 @@ export default function SessionList() {
       list = list.filter(s => new Date(s.last_active || s.created_at).getTime() >= cutoff)
     }
     return list
-  }, [sessions, statusFilter, timeFilter])
+  }, [sessions, query, statusFilter, timeFilter])
 
   const { sorted, sortKey, sortDir, onSort } = useTableSort(filtered, {
     model: s => s.llm_model ?? '',
@@ -101,9 +114,10 @@ export default function SessionList() {
           ) : (
             <div className="font-mono text-[12px] font-medium text-ink-50">Session {s.id.slice(-8)}</div>
           )}
-          <div className="max-w-[360px] truncate text-[11px] text-ink-400" title={`${s.id} · created ${formatDateTime(s.created_at)}`}>
-            Created {timeAgo(s.created_at)}
+          <div className="max-w-[360px] break-all font-mono text-[11px] text-ink-400" title={s.id}>
+            ID {s.id}
           </div>
+          <div className="mt-0.5 text-[11px] text-ink-500">Created {timeAgo(s.created_at)}</div>
         </div>
       ),
     },
@@ -137,6 +151,11 @@ export default function SessionList() {
     <div className="mx-auto max-w-[1200px]">
       <PageHeader title="Sessions" description="Find a conversation and pick up where you left off." />
 
+      <div className="relative mb-4 max-w-md animate-fade-up">
+        <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+        <Input aria-label="Search sessions by title or ID" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search title or session ID" className="pl-9" />
+      </div>
+
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-3 animate-fade-up">
         <div className="flex items-center gap-1 rounded-lg border border-ink-700 bg-ink-900 p-0.5">
@@ -162,7 +181,7 @@ export default function SessionList() {
             {TIME_RANGES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
           </NativeSelect>
         </div>
-        <span className="w-full text-[12px] text-ink-400 sm:ml-auto sm:w-auto">{sorted.length} sessions</span>
+        <span className="w-full text-[12px] text-ink-400 sm:ml-auto sm:w-auto">{query.trim() && hasMore && !loadMoreError ? 'Searching all sessions…' : `${sorted.length} ${sorted.length === 1 ? 'session' : 'sessions'}`}</span>
       </div>
 
       <Card className="overflow-hidden animate-fade-up">
@@ -190,7 +209,7 @@ export default function SessionList() {
           <EmptyState
             icon={<MessagesSquare className="h-5 w-5" />}
             title="No sessions found"
-            description="Try adjusting your filters, or start a new conversation from the Chat page."
+            description={query.trim() && hasMore && !loadMoreError ? 'Searching older sessions…' : 'Try adjusting your search or filters, or start a new conversation from the Chat page.'}
             action={<Button variant="outline" size="sm" onClick={() => navigate('/chat')}>Go to chat</Button>}
           />
         )}
@@ -199,7 +218,7 @@ export default function SessionList() {
       {hasMore && !loading && !error && (
         <div className="mt-4 flex justify-center">
           <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => void loadMore()}>
-            {loadingMore ? 'Loading…' : 'Load more'}
+            {loadingMore ? 'Loading…' : loadMoreError ? 'Retry loading sessions' : 'Load more'}
           </Button>
         </div>
       )}

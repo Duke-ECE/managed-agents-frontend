@@ -1,5 +1,5 @@
 import { lazy, useEffect } from 'react'
-import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AuthProvider, RequireAuth } from './components/AuthProvider'
 import DashboardLayout from './layouts/DashboardLayout'
 import LoginPage from './pages/login/LoginPage'
@@ -13,6 +13,7 @@ import { API_GUIDE_URL } from './lib/navigation'
 // eager — it is the sign-in page. The Suspense boundary lives in
 // DashboardLayout around the <Outlet />.
 const SessionList = lazy(() => import('./pages/sessions/SessionList'))
+const HomePage = lazy(() => import('./pages/home/HomePage'))
 const ChatPage = lazy(() => import('./pages/chat/ChatPage'))
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'))
 const AgentsPage = lazy(() => import('./pages/agents/AgentsPage'))
@@ -42,7 +43,7 @@ function AppRoutes() {
       }
     >
       <Route path="/sessions" element={<SessionList />} />
-      <Route path="/console" element={<Navigate to="/agents" replace />} />
+      <Route path="/console" element={<HomePage />} />
       <Route path="/chat" element={<ChatPage />} />
       <Route path="/chat/:id" element={<ChatPage />} />
       <Route path="/admin" element={<AdminPage />} />
