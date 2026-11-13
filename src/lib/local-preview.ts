@@ -59,6 +59,7 @@ type PreviewAgent = {
   has_api_key: boolean
   llm_base_url: string
   llm_model: string
+  thinking_mode?: string
   tools: string[]
   visibility: 'platform' | 'private'
   created_at: string
@@ -226,6 +227,7 @@ export async function localPreviewFetch(input: RequestInfo | URL, init?: Request
       llm_mode: data.llm_mode === 'custom' ? 'custom' : 'platform_default',
       has_api_key: Boolean(data.llm_api_key), llm_base_url: String(data.llm_base_url ?? ''),
       llm_model: String(data.llm_model ?? 'Platform default'),
+      thinking_mode: String(data.thinking_mode ?? ''),
       tools: Array.isArray(data.tools) ? data.tools.map(String) : [],
       visibility: 'private', created_at: now, updated_at: now,
     }
@@ -243,6 +245,7 @@ export async function localPreviewFetch(input: RequestInfo | URL, init?: Request
     agent.llm_mode = data.llm_mode === 'custom' ? 'custom' : 'platform_default'
     agent.llm_base_url = String(data.llm_base_url ?? agent.llm_base_url)
     agent.llm_model = String(data.llm_model ?? agent.llm_model)
+    agent.thinking_mode = String(data.thinking_mode ?? agent.thinking_mode ?? '')
     agent.tools = Array.isArray(data.tools) ? data.tools.map(String) : agent.tools
     if (data.llm_api_key) agent.has_api_key = true
     agent.updated_at = new Date().toISOString()
