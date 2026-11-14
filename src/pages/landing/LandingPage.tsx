@@ -94,6 +94,7 @@ export default function LandingPage({ page }: { page: MarketingPage }) {
           <span>PolyAgent</span>
         </Link>
         <nav aria-label="Main navigation" className="landing-nav">
+          <NavLink to="/" end>Home</NavLink>
           <NavLink to="/how-it-works">How it works</NavLink>
           <NavLink to="/capabilities">Capabilities</NavLink>
           <NavLink to="/docs">Docs</NavLink>
