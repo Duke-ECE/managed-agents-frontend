@@ -6,19 +6,16 @@ import './landing.css'
 
 const features = [
   {
-    number: '01',
     icon: Bot,
     title: 'Configure hosted agents',
     description: 'Define reusable agents with their own instructions and model configuration.',
   },
   {
-    number: '02',
     icon: Radio,
     title: 'Stream conversations',
     description: 'Your server calls the chat API and receives replies as a live event stream.',
   },
   {
-    number: '03',
     icon: Database,
     title: 'Keep session history',
     description: 'Sessions and transcripts remain available so your app can resume a conversation later.',
@@ -87,15 +84,17 @@ export default function LandingPage() {
           <a href="#features">Capabilities</a>
           <a href={DOCS_URL}>Docs</a>
         </nav>
-        <Link className="landing-login" to={session ? destination : '/login'}>
-          {session ? 'Open console' : 'Log in'} <ArrowRight size={15} />
-        </Link>
+        <div className="landing-header-actions">
+          <a className="landing-mobile-docs" href={DOCS_URL}>Docs</a>
+          <Link className="landing-login" to={session ? destination : '/login'}>
+            {session ? 'Open console' : 'Log in'} <ArrowRight size={15} />
+          </Link>
+        </div>
       </header>
 
       <main>
         <section className="landing-hero">
           <div className="landing-hero-copy">
-            <div className="landing-eyebrow"><span /> AGENT HOSTING FOR APPLICATIONS</div>
             <h1>Hosted agents<br /><span>for your apps.</span></h1>
             <p>PolyAgent gives other applications a place to run agents. Configure them in one console, connect from your server with an API key, and keep conversations available across sessions.</p>
             <div className="landing-actions">
@@ -109,7 +108,6 @@ export default function LandingPage() {
 
         <section className="landing-flow" id="how-it-works" aria-labelledby="landing-flow-title">
           <div className="landing-section-heading">
-            <span className="landing-section-kicker">HOW IT WORKS</span>
             <h2 id="landing-flow-title">Connect your application to an agent.</h2>
           </div>
           <div className="landing-flow-grid">
@@ -121,13 +119,12 @@ export default function LandingPage() {
 
         <section className="landing-features" id="features" aria-labelledby="landing-features-title">
           <div className="landing-section-heading">
-            <span className="landing-section-kicker">THE PLATFORM</span>
             <h2 id="landing-features-title">Agent infrastructure your app can use.</h2>
           </div>
           <div className="landing-feature-grid">
-            {features.map(({ number, icon: Icon, title, description }) => (
-              <article className="landing-feature" key={number}>
-                <div className="landing-feature-top"><Icon size={20} strokeWidth={1.7} /><span>{number}</span></div>
+            {features.map(({ icon: Icon, title, description }) => (
+              <article className="landing-feature" key={title}>
+                <div className="landing-feature-icon"><Icon size={21} strokeWidth={1.7} /></div>
                 <h3>{title}</h3>
                 <p>{description}</p>
               </article>
@@ -136,9 +133,11 @@ export default function LandingPage() {
         </section>
 
         <section className="landing-end">
-          <span className="landing-section-kicker">READY WHEN YOU ARE</span>
           <h2>Give your application an agent.</h2>
-          <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
+          <div className="landing-end-actions">
+            <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
+            <a className="landing-secondary" href={DOCS_URL}>Read the docs <ArrowRight size={15} /></a>
+          </div>
         </section>
       </main>
 
