@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom'
-import { AppWindow, ArrowRight, Bot, Check, Database, KeyRound, Radio, ShieldCheck } from 'lucide-react'
+import { useEffect } from 'react'
+import { Link, NavLink } from 'react-router-dom'
+import { AppWindow, ArrowRight, BookOpen, Bot, Check, Code2, Database, KeyRound, Network, Radio, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../../components/AuthProvider'
 import { API_GUIDE_URL, CONSOLE_PATH, DOCS_URL } from '../../lib/navigation'
 import './landing.css'
@@ -68,9 +69,22 @@ function ProductPreview() {
   )
 }
 
-export default function LandingPage() {
+type MarketingPage = 'home' | 'how-it-works' | 'capabilities' | 'docs'
+
+const docsLinks = [
+  { icon: BookOpen, title: 'Documentation home', description: 'Start with the product overview and find your way through the guides.', href: DOCS_URL },
+  { icon: Code2, title: 'API guide', description: 'Create an API key, start a session, and stream an agent response.', href: API_GUIDE_URL },
+  { icon: Network, title: 'Architecture', description: 'See how the frontend, backend, runtime, and session service connect.', href: `${DOCS_URL}architecture` },
+]
+
+export default function LandingPage({ page }: { page: MarketingPage }) {
   const { session } = useAuth()
   const destination = CONSOLE_PATH
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    document.title = page === 'home' ? 'PolyAgent' : `${page === 'how-it-works' ? 'How it works' : page === 'capabilities' ? 'Capabilities' : 'Docs'} · PolyAgent`
+  }, [page])
 
   return (
     <div className="landing-page">
@@ -80,12 +94,11 @@ export default function LandingPage() {
           <span>PolyAgent</span>
         </Link>
         <nav aria-label="Main navigation" className="landing-nav">
-          <a href="#how-it-works">How it works</a>
-          <a href="#features">Capabilities</a>
-          <a href={DOCS_URL}>Docs</a>
+          <NavLink to="/how-it-works">How it works</NavLink>
+          <NavLink to="/capabilities">Capabilities</NavLink>
+          <NavLink to="/docs">Docs</NavLink>
         </nav>
         <div className="landing-header-actions">
-          <a className="landing-mobile-docs" href={DOCS_URL}>Docs</a>
           <Link className="landing-login" to={session ? destination : '/login'}>
             {session ? 'Open console' : 'Log in'} <ArrowRight size={15} />
           </Link>
@@ -93,55 +106,81 @@ export default function LandingPage() {
       </header>
 
       <main>
-        <section className="landing-hero">
-          <div className="landing-hero-copy">
-            <h1>Hosted agents<br /><span>for your apps.</span></h1>
-            <p>PolyAgent gives other applications a place to run agents. Configure them in one console, connect from your server with an API key, and keep conversations available across sessions.</p>
-            <div className="landing-actions">
-              <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
-              <a className="landing-secondary" href={API_GUIDE_URL}>Explore the API <ArrowRight size={15} /></a>
+        {page === 'home' && (
+          <section className="landing-hero">
+            <div className="landing-hero-copy">
+              <h1>Hosted agents<br /><span>for your apps.</span></h1>
+              <p>PolyAgent gives other applications a place to run agents. Configure them in one console, connect from your server with an API key, and keep conversations available across sessions.</p>
+              <div className="landing-actions">
+                <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
+                <a className="landing-secondary" href={API_GUIDE_URL}>Explore the API <ArrowRight size={15} /></a>
+              </div>
+              <div className="landing-hero-foot"><ShieldCheck size={15} /> Keep API keys on your server, away from browser code</div>
             </div>
-            <div className="landing-hero-foot"><ShieldCheck size={15} /> Keep API keys on your server, away from browser code</div>
-          </div>
-          <div className="landing-hero-visual"><ProductPreview /></div>
-        </section>
+            <div className="landing-hero-visual"><ProductPreview /></div>
+          </section>
+        )}
 
-        <section className="landing-flow" id="how-it-works" aria-labelledby="landing-flow-title">
-          <div className="landing-section-heading">
-            <h2 id="landing-flow-title">Connect your application to an agent.</h2>
+        {page === 'how-it-works' && <section className="landing-subpage" aria-labelledby="landing-how-title">
+          <div className="landing-subpage-intro">
+            <h1 id="landing-how-title">Connect your application to an agent.</h1>
+            <p>Configure an agent once, then let your server create conversations and stream responses through the PolyAgent API.</p>
           </div>
-          <div className="landing-flow-grid">
-            <div><span>01 / CONFIGURE</span><h3>Define the agent</h3><p>Set its instructions and model in the console, then use its agent ID in your app.</p></div>
-            <div><span>02 / CONNECT</span><h3>Call the API</h3><p>Create an API key for your server. Start a session and send messages through authenticated endpoints.</p></div>
-            <div><span>03 / RESPOND</span><h3>Stream and resume</h3><p>Display replies as they arrive and use the saved session ID to continue later.</p></div>
+          <div className="landing-flow">
+            <div className="landing-flow-grid">
+              <div><span>01 / CONFIGURE</span><h2>Define the agent</h2><p>Set its instructions and model in the console, then use its agent ID in your app.</p></div>
+              <div><span>02 / CONNECT</span><h2>Call the API</h2><p>Create an API key for your server. Start a session and send messages through authenticated endpoints.</p></div>
+              <div><span>03 / RESPOND</span><h2>Stream and resume</h2><p>Display replies as they arrive and use the saved session ID to continue later.</p></div>
+            </div>
           </div>
-        </section>
+          <div className="landing-note"><ShieldCheck size={19} /><p>Call the API from your server so your API key stays out of browser code. <a href={API_GUIDE_URL}>Follow the API guide <ArrowRight size={14} /></a></p></div>
+        </section>}
 
-        <section className="landing-features" id="features" aria-labelledby="landing-features-title">
-          <div className="landing-section-heading">
-            <h2 id="landing-features-title">Agent infrastructure your app can use.</h2>
+        {page === 'capabilities' && <section className="landing-subpage" aria-labelledby="landing-capabilities-title">
+          <div className="landing-subpage-intro">
+            <h1 id="landing-capabilities-title">Agent infrastructure your app can use.</h1>
+            <p>Give your application a reusable agent and a conversation API, with sessions you can return to later.</p>
           </div>
-          <div className="landing-feature-grid">
-            {features.map(({ icon: Icon, title, description }) => (
-              <article className="landing-feature" key={title}>
-                <div className="landing-feature-icon"><Icon size={21} strokeWidth={1.7} /></div>
-                <h3>{title}</h3>
-                <p>{description}</p>
-              </article>
+          <div className="landing-features">
+            <div className="landing-feature-grid">
+              {features.map(({ icon: Icon, title, description }) => (
+                <article className="landing-feature" key={title}>
+                  <div className="landing-feature-icon"><Icon size={21} strokeWidth={1.7} /></div>
+                  <h2>{title}</h2>
+                  <p>{description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+          <Link className="landing-text-link" to="/how-it-works">See how it works <ArrowRight size={16} /></Link>
+        </section>}
+
+        {page === 'docs' && <section className="landing-subpage" aria-labelledby="landing-docs-title">
+          <div className="landing-subpage-intro">
+            <h1 id="landing-docs-title">Build with PolyAgent.</h1>
+            <p>Find the guides and reference material for connecting your application, understanding the platform, and working with its API.</p>
+          </div>
+          <div className="landing-docs-grid">
+            {docsLinks.map(({ icon: Icon, title, description, href }) => (
+              <a className="landing-doc-card" href={href} key={title} aria-label={title}>
+                <Icon size={22} strokeWidth={1.7} />
+                <div><h2>{title}</h2><p>{description}</p></div>
+                <ArrowRight size={18} />
+              </a>
             ))}
           </div>
-        </section>
+        </section>}
 
         <section className="landing-end">
           <h2>Give your application an agent.</h2>
           <div className="landing-end-actions">
             <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
-            <a className="landing-secondary" href={DOCS_URL}>Read the docs <ArrowRight size={15} /></a>
+            <Link className="landing-secondary" to="/docs">Read the docs <ArrowRight size={15} /></Link>
           </div>
         </section>
       </main>
 
-      <footer className="landing-footer"><span>PolyAgent</span><a href={DOCS_URL}>Docs <ArrowRight size={13} /></a></footer>
+      <footer className="landing-footer"><span>PolyAgent</span><Link to="/docs">Docs <ArrowRight size={13} /></Link></footer>
     </div>
   )
 }

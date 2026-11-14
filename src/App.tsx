@@ -33,7 +33,10 @@ function AppRoutes() {
   </main>
 
   return <Routes>
-    <Route path="/" element={<LandingPage />} />
+    <Route path="/" element={<LandingPage page="home" />} />
+    <Route path="/how-it-works" element={<LandingPage page="how-it-works" />} />
+    <Route path="/capabilities" element={<LandingPage page="capabilities" />} />
+    <Route path="/docs" element={<LandingPage page="docs" />} />
     <Route path="/login" element={<LoginPage />} />
     <Route
       element={
