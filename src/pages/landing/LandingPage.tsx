@@ -77,6 +77,8 @@ const docsLinks = [
   { icon: Network, title: 'Architecture', description: 'See how the frontend, backend, runtime, and session service connect.', href: `${DOCS_URL}architecture` },
 ]
 
+const GITHUB_URL = 'https://github.com/L-Rocket/PolyAgent'
+
 export default function LandingPage({ page }: { page: MarketingPage }) {
   const { session } = useAuth()
   const destination = CONSOLE_PATH
@@ -115,11 +117,21 @@ export default function LandingPage({ page }: { page: MarketingPage }) {
               <div className="landing-actions">
                 <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
                 <a className="landing-secondary" href={API_GUIDE_URL}>Explore the API <ArrowRight size={15} /></a>
-                <a className="landing-secondary" href="https://github.com/L-Rocket/PolyAgent" target="_blank" rel="noopener noreferrer"><Github size={16} /> View on GitHub</a>
               </div>
               <div className="landing-hero-foot"><ShieldCheck size={15} /> Keep API keys on your server, away from browser code</div>
             </div>
             <div className="landing-hero-visual"><ProductPreview /></div>
+          </section>
+        )}
+
+        {page === 'home' && (
+          <section className="landing-open-source" aria-labelledby="landing-open-source-title">
+            <div>
+              <Github size={22} aria-hidden="true" />
+              <h2 id="landing-open-source-title">Built in the open.</h2>
+              <p>Explore the PolyAgent project and its repositories on GitHub.</p>
+            </div>
+            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">View on GitHub <ArrowRight size={16} aria-hidden="true" /></a>
           </section>
         )}
 
@@ -182,7 +194,13 @@ export default function LandingPage({ page }: { page: MarketingPage }) {
         </section>
       </main>
 
-      <footer className="landing-footer"><span>PolyAgent</span><Link to="/docs">Docs <ArrowRight size={13} /></Link></footer>
+      <footer className="landing-footer">
+        <span>PolyAgent</span>
+        <div className="landing-footer-links">
+          <Link to="/docs">Docs <ArrowRight size={13} aria-hidden="true" /></Link>
+          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">GitHub <ArrowRight size={13} aria-hidden="true" /></a>
+        </div>
+      </footer>
     </div>
   )
 }

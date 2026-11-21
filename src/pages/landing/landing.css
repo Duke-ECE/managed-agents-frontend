@@ -122,11 +122,19 @@
 .landing-feature-icon { grid-area: icon; display: flex; width: 40px; height: 40px; align-items: center; justify-content: center; border: 1px solid #34425c; border-radius: 10px; color: #9db6ef; }
 .landing-feature h2 { grid-area: title; margin: 8px 0 0; }
 .landing-feature p { grid-area: description; max-width: 48ch; margin: 7px 0 0; font-size: 14px; }
+.landing-open-source { display: flex; align-items: center; justify-content: space-between; gap: 32px; width: min(1280px, calc(100% - 72px)); margin: 0 auto; padding: 36px 0 42px; border-top: 1px solid #343a48; }
+.landing-open-source > div { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 15px; align-items: start; }
+.landing-open-source > div > svg { grid-row: 1 / 3; margin-top: 4px; color: #9db6ef; }
+.landing-open-source h2 { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 600; letter-spacing: -.035em; }
+.landing-open-source p { margin: 7px 0 0; color: #969dab; font-size: 13px; line-height: 1.6; }
+.landing-open-source > a { display: inline-flex; min-height: 44px; flex: none; align-items: center; gap: 9px; color: #d6d9e3; font-size: 13px; font-weight: 600; }
+.landing-open-source > a:hover, .landing-open-source > a:focus-visible { color: #fff; }
 .landing-end { display: flex; flex-direction: column; align-items: center; padding: 94px 24px 108px; border-top: 1px solid #252935; background: radial-gradient(ellipse at 50% 110%, rgb(43 80 167 / .17), transparent 62%), #0c0e13; text-align: center; }
 .landing-end h2 { margin-bottom: 28px; }
 .landing-end-actions { display: flex; align-items: center; gap: 26px; }
 .landing-footer { display: flex; align-items: center; justify-content: space-between; width: min(1280px, calc(100% - 72px)); min-height: 72px; margin: 0 auto; color: #777e8e; font-size: 11px; }
 .landing-footer a { display: inline-flex; align-items: center; gap: 7px; color: #999fac; }
+.landing-footer-links { display: flex; align-items: center; gap: 26px; }
 
 /* The product illustration stays dark; the surrounding page follows the app theme. */
 .light .landing-page { color: #101320; background: #f5f6f9; }
@@ -158,6 +166,11 @@
 .light .landing-flow-grid p, .light .landing-feature p { color: #606878; }
 .light .landing-feature-grid, .light .landing-feature { border-color: #d1d4dc; }
 .light .landing-feature-icon { border-color: #cbd7ec; color: #0059c9; }
+.light .landing-open-source { border-color: #d1d4dc; }
+.light .landing-open-source > div > svg { color: #0059c9; }
+.light .landing-open-source p { color: #606878; }
+.light .landing-open-source > a { color: #232734; }
+.light .landing-open-source > a:hover, .light .landing-open-source > a:focus-visible { color: #0059c9; }
 .light .landing-end { border-color: #dfe2e9; background: radial-gradient(ellipse at 50% 110%, rgb(43 80 167 / .08), transparent 62%), #eef0f5; }
 .light .landing-footer a { color: #4d5564; }
 
@@ -171,7 +184,7 @@
 }
 
 @media (max-width: 640px) {
-  .landing-header, .landing-hero, .landing-flow, .landing-features, .landing-footer, .landing-subpage { width: min(100% - 36px, 1280px); }
+  .landing-header, .landing-hero, .landing-flow, .landing-features, .landing-open-source, .landing-footer, .landing-subpage { width: min(100% - 36px, 1280px); }
   .landing-header { display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'brand actions' 'nav nav'; gap: 8px 0; height: auto; padding: 13px 0 0; }
   .landing-brand { grid-area: brand; }
   .landing-nav { grid-area: nav; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; width: 100%; height: 44px; margin: 0; }
@@ -208,6 +221,8 @@
   .landing-flow-grid > div { padding-bottom: 18px; }
   .landing-flow-grid h2 { margin-top: 15px; }
   .landing-feature { padding: 22px 0; }
+  .landing-open-source { align-items: flex-start; flex-direction: column; gap: 14px; padding: 30px 0 35px; }
+  .landing-open-source h2 { font-size: 20px; }
   .landing-end-actions { flex-wrap: wrap; justify-content: center; gap: 8px 22px; }
 }
 
