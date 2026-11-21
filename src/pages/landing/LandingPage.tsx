@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { AppWindow, ArrowRight, BookOpen, Bot, Check, Code2, Database, KeyRound, Network, Radio, ShieldCheck } from 'lucide-react'
+import { AppWindow, ArrowRight, BookOpen, Bot, Check, Code2, Database, Github, KeyRound, Network, Radio, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../../components/AuthProvider'
 import { API_GUIDE_URL, CONSOLE_PATH, DOCS_URL } from '../../lib/navigation'
 import './landing.css'
@@ -115,6 +115,7 @@ export default function LandingPage({ page }: { page: MarketingPage }) {
               <div className="landing-actions">
                 <Link className="landing-primary" to={destination}>Open the console <ArrowRight size={17} /></Link>
                 <a className="landing-secondary" href={API_GUIDE_URL}>Explore the API <ArrowRight size={15} /></a>
+                <a className="landing-secondary" href="https://github.com/L-Rocket/PolyAgent" target="_blank" rel="noopener noreferrer"><Github size={16} /> View on GitHub</a>
               </div>
               <div className="landing-hero-foot"><ShieldCheck size={15} /> Keep API keys on your server, away from browser code</div>
             </div>
