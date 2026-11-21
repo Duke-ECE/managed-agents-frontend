@@ -37,7 +37,11 @@ async function signInWithOAuth(provider: 'github' | 'google', redirectPath: stri
   sessionStorage.setItem(OAUTH_REDIRECT_KEY, redirectPath)
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
-    options: { redirectTo: window.location.origin },
+    options: {
+      redirectTo: window.location.origin,
+      // GitHub otherwise silently reuses the account already signed in there.
+      ...(provider === 'github' ? { queryParams: { prompt: 'select_account' } } : {}),
+    },
   })
   if (error) {
     sessionStorage.removeItem(OAUTH_REDIRECT_KEY)
