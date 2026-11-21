@@ -7,6 +7,7 @@ import {
   type AgentInput,
   type AgentTemplate,
   type LlmMode,
+  type ThinkingMode,
 } from '../../lib/chat-api'
 import Drawer from '../../components/Drawer'
 import StatusBadge from '../../components/StatusBadge'
@@ -29,6 +30,7 @@ interface Draft {
   apiKey: string
   baseUrl: string
   model: string
+  thinkingMode: ThinkingMode
   tools: string[]
 }
 
@@ -62,6 +64,7 @@ function draftFrom(state: AgentDrawerState, platformBlocked: boolean): Draft {
       apiKey: '',
       baseUrl: DEFAULT_BASE_URL,
       model: DEFAULT_MODEL,
+      thinkingMode: '',
       tools: [...AGENT_TOOLS],
     }
   }
@@ -73,6 +76,7 @@ function draftFrom(state: AgentDrawerState, platformBlocked: boolean): Draft {
     apiKey: '',
     baseUrl: source.llm_base_url || DEFAULT_BASE_URL,
     model: source.llm_model || DEFAULT_MODEL,
+    thinkingMode: source.thinking_mode || '',
     // An empty whitelist means "all tools" — render it as all four checked.
     tools: source.tools.length > 0 ? source.tools : [...AGENT_TOOLS],
   }
@@ -136,6 +140,7 @@ export default function AgentFormDrawer({
         llm_mode: draft.llmMode,
         llm_base_url: draft.llmMode === 'custom' ? draft.baseUrl.trim() : '',
         llm_model: draft.llmMode === 'custom' ? draft.model.trim() : '',
+        thinking_mode: draft.thinkingMode,
         // All four checked = the "all tools" default, submitted as [].
         tools: AGENT_TOOLS.every((t) => draft.tools.includes(t)) ? [] : draft.tools,
       }
@@ -314,6 +319,27 @@ export default function AgentFormDrawer({
               </div>
             </div>
           )}
+        </div>
+
+        <div>
+          <label htmlFor="agent-thinking-mode" className={labelCls}>Thinking mode</label>
+          <select
+            id="agent-thinking-mode"
+            disabled={readOnly}
+            value={draft.thinkingMode}
+            onChange={(e) => setDraft((d) => ({ ...d, thinkingMode: e.target.value as ThinkingMode }))}
+            className="h-9 w-full rounded-lg border border-ink-700 bg-ink-850 px-3 text-[12px] text-ink-200 disabled:opacity-60"
+          >
+            <option value="">Automatic (recommended)</option>
+            <option value="off">Off</option>
+            <option value="low">Low</option>
+            <option value="high">High</option>
+            <option value="max">Max</option>
+            <option value="provider_default">Provider default</option>
+          </select>
+          <p className="mt-2 text-[11px] text-ink-500">
+            Applied when a new chat starts. Off, Low, High, and Max currently require the official DeepSeek Flash endpoint.
+          </p>
         </div>
 
         <div>
