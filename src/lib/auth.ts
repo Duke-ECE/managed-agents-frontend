@@ -1,5 +1,5 @@
 /**
- * Supabase auth — GitHub OAuth. The client is created from build-time env
+ * Supabase auth — email/password and social OAuth. The client is created from build-time env
  * vars (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). When they are missing
  * the app must not crash: `authConfigured` is false, every helper becomes a
  * no-op, and the UI renders a config error state instead.
@@ -28,7 +28,7 @@ export async function getSession(): Promise<Session | null> {
 
 const OAUTH_REDIRECT_KEY = 'managed-agents.oauth-redirect'
 
-export async function signInWithGitHub(redirectPath = CONSOLE_PATH): Promise<void> {
+async function signInWithOAuth(provider: 'github' | 'google', redirectPath: string): Promise<void> {
   if (!supabase) return
   // The OAuth round-trip drops the SPA's router state, so the intended
   // destination survives in sessionStorage; AuthProvider consumes it once a
@@ -36,13 +36,21 @@ export async function signInWithGitHub(redirectPath = CONSOLE_PATH): Promise<voi
   // route, so return to the origin before restoring the intended path.
   sessionStorage.setItem(OAUTH_REDIRECT_KEY, redirectPath)
   const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'github',
+    provider,
     options: { redirectTo: window.location.origin },
   })
   if (error) {
     sessionStorage.removeItem(OAUTH_REDIRECT_KEY)
     throw error
   }
+}
+
+export function signInWithGitHub(redirectPath = CONSOLE_PATH): Promise<void> {
+  return signInWithOAuth('github', redirectPath)
+}
+
+export function signInWithGoogle(redirectPath = CONSOLE_PATH): Promise<void> {
+  return signInWithOAuth('google', redirectPath)
 }
 
 /** Read and clear the path stored before the OAuth redirect, if any. */
